@@ -1,6 +1,7 @@
 using PCquery
 using Test
 
-@testset "PCquery.jl" begin
-    # Write your tests here.
+@testset "escape search uri" begin
+    @test HTTP.escapeuri("i+am sam.") == "i%2Bam%20sam."
+    @test escapeuri("i+am sam.") == "i+am%20sam."
 end
