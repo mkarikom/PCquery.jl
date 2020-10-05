@@ -8,11 +8,13 @@ using LightGraphs, MetaGraphs, GraphPlot
 # http
 export issafe,escapeuri,delimitValues
 # search
-export resultData, nodeLabels
+export resultData, nodeLabels, cleanMissing
 # graphs
 export getEdges,loadGraph
 # sample queries
-export path_pc, go_obo, urlForm
+export path_pc, go_obo, urlForm, path_pc_recurse
+# strings
+export subStrVec
 
 
 include("Http.jl") # override delimiters

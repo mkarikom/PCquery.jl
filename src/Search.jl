@@ -117,58 +117,19 @@ function indexFeature(flist::Vector,fname::Symbol,
     inds
 end
 
-# get left,right using the value of surveilance rows to identify:
-# each row will always have a "left" and a "right" (for the head and tail of a pathway these carry special importance)
-# the head of the pathway as a "left" where the surveilance column is "lig_rec_complex"
-# the tail of the pathway as a "right" where the surveilance column is "transcription complex"
-function nodeLabels(df::DataFrame,left::Symbol,right::Symbol,
-					keyvals...)
-	# Ex.
-	# keyvals[1] = Dict(:lr=>:left,
-	#					:key=>:llocref,
-	# 				    :val=>"http://pathwaycommons.org/pc11/#UnificationXref_gene_ontology_GO_0005829")
-	len = size(df,1)
-	nodes = vcat(df[!,left],df[!,right])
-	vals = []
-	lr = []
-
-	for n in 1:length(nodes)
-		for kv in 1:length(keyvals)
-			if keyvals[kv][:lr] == lr[n]
-				push!(lr,lr[n])
-				push!(vals,keyvals[kv][:val])
+# remove missing values and unpack concatenated vectors
+function cleanMissing(inCol::Vector,pre::Function)
+	outCol = []
+	for n in 1:length(inCol)
+		if !ismissing(inCol[n])
+			if length(inCol[n]) > 0
+				push!(outCol,pre.(vec(split(inCol[n],","))))
+			elseif length(inCol[n]) == 0
+				push!(outCol,missing)
 			end
+		elseif ismissing(inCol[n])
+			push!(outCol,missing)
 		end
-
 	end
-	DataFrame(:nodes=>nodes,:vals=>vals,:lr=>lr)
-
-	#
-	# allkeys = vcat(df[!,leftkey],df[!,rightkey])
-	# lr = vcat(fill(leftkey,len),fill(rightkey,len))
-	# uniqueind = unique(i -> allkeys[i], 1:length(allkeys))
-	#
-	# allkeys = allkeys[uniqueind]
-	# lr = lr[uniqueind]
-	#
-	# sind = sortperm(allkeys)
-	# allkeys = allkeys[sind]
-	# lr = lr[sind]
-	#
-	# dflr = []
-	# for k in 1:length(allkeys)
-	# 	if lr[k] == leftkey
-	# 		findfirst(x->x==leftval,df[!,leftkey])
-	# 	end
-	# 	findfirst(x->, df[!,lr[k]])
-	# end
-	# unique(i -> x[i], 1:length(x))
-	#
-	# labels = Int64(zeros(length(nodes)))
-	#
-	# for v in 1:length(featvals)
-	# 	for n in 1:length(nodes)
-	# 		findfirst
-	# 	end
-	# end
+	outCol
 end
