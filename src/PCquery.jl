@@ -4,15 +4,16 @@ import HTTP.IOExtras
 using HTTP
 using LightXML,DataFrames
 using LightGraphs, MetaGraphs, GraphPlot
+using Mustache
 
 # http
 export issafe,escapeuri,delimitValues
 # search
 export resultData, nodeLabels, cleanMissing
 # graphs
-export getEdges,loadGraph
+export getEdges,loadGraph, initBpGraph
 # sample queries
-export path_pc, go_obo, urlForm, path_pc_recurse
+export path_pc, go_obo, urlForm, path_pc_recurse, pc_f0
 # strings
 export subStrVec
 

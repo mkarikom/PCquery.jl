@@ -1,5 +1,44 @@
 # strings for sample queries
 
+function pc_f0(pathVals::String)
+    str=
+    """
+    PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+    PREFIX dcterms: <http://purl.org/dc/terms/>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
+
+    SELECT DISTINCT ?pw ?interactionPathComp ?interactionType
+                    ?left ?right ?ltype ?rtype ?llocref ?rlocref
+                    ?cltype ?ctrlEntity ?ctrlEntityType
+    FROM <http://www.ontotext.com/explicit>
+    WHERE {
+        ?pw bp:xref [ bp:id ?pwid] ;
+            bp:pathwayComponent* ?interactionPathComp .
+             # VALUES ?pwid {"R-HSA-2122948"^^xsd:string
+             #                 "R-HSA-2122947"^^xsd:string}
+            VALUES ?pwid $pathVals
+
+            ?interactionType ^a ?interactionPathComp ;
+                             rdfs:subClassOf+ bp:Interaction .
+
+            ?left ^bp:left ?interactionPathComp ;
+                   a ?ltype ;
+                   bp:cellularLocation [ bp:term ?lloc ;
+                                         bp:xref ?llocref ] .
+            ?right ^bp:right ?interactionPathComp ;
+                   a ?rtype ;
+                   bp:cellularLocation [ bp:term ?rloc ;
+                                         bp:xref ?rlocref ] .
+            OPTIONAL { ?interactionPathComp ^bp:controlled [ bp:controlType ?cltype ;
+                                            bp:controller ?ctrlEntity ] .
+        			   ?ctrlEntity a ?ctrlEntityType }
+        }
+    """
+    return str
+end
+
 function path_pc(pathVals::String)
     """
     PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
@@ -8,117 +47,117 @@ function path_pc(pathVals::String)
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
     PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
 
-    SELECT DISTINCT ?left ?right ?pw ?pathname ?pc ?ctype ?ltype ?rtype ?llocref ?rlocref ?cltype ?controller ?transcriptionController ?cxRefL ?cxRefR ?upRefL ?upRefR ?upDnaRefL ?upDnaRefR
-    # (GROUP_CONCAT(?leref; SEPARATOR = ",") AS ?lerefs) (GROUP_CONCAT(?reref; SEPARATOR = ",") AS ?rerefs)
+    SELECT DISTINCT ?left ?right ?pw ?pathname ?interactionPathComp ?interactionType ?ltype ?rtype ?llocref ?rlocref ?cltype ?ctrlEntity ?interactionCtrl ?cxRefL ?cxRefR ?upRefL ?upRefR ?upDnaRefL ?upDnaRefR ?dbleft ?dbright
 
     WHERE {
         OPTIONAL { ?left a bp:Complex ;
                          bp:xref [ a bp:UnificationXref ;
-                                   bp:db "reactome"^^xsd:string ;
-                                   bp:id ?cxRefL] }
+                                   bp:db ?dbleft ;
+                                   bp:id ?cxRefL]
+                   FILTER regex(?dbleft, "^.*reactome") }
 
         OPTIONAL { ?right a bp:Complex ;
                          bp:xref [ a bp:UnificationXref ;
-                                   bp:db "reactome"^^xsd:string ;
-                                   bp:id ?cxRefR] }
+                                   bp:db ?dbright ;
+                                   bp:id ?cxRefR]
+                   FILTER regex(?dbright, "^.*reactome") }
 
         OPTIONAL { ?left a bp:Protein ;
                          bp:entityReference/bp:memberEntityReference/bp:xref [ a bp:UnificationXref ;
-                                                                               bp:db ?dbname ;
+                                                                               bp:db ?dbleft ;
                                                                                bp:id ?upRefL ]
-                    FILTER regex(?dbname, "^.*uniprot") }
+                    FILTER regex(?dbleft, "^.*uniprot") }
 
         OPTIONAL { ?right a bp:Protein ;
                           bp:entityReference/bp:memberEntityReference/bp:xref [ a bp:UnificationXref ;
-                                                                                bp:db ?dbname ;
+                                                                                bp:db ?dbright ;
                                                                                 bp:id ?upRefR ]
-                    FILTER regex(?dbname, "^.*uniprot") }
+                    FILTER regex(?dbright, "^.*uniprot") }
 
         OPTIONAL { ?left a bp:Protein ;
                          bp:entityReference [ a bp:ProteinReference ;
-                                              bp:xref [ bp:db ?dbname ;
+                                              bp:xref [ bp:db ?dbleft ;
                                                         bp:id ?upRefL ] ] .
                     FILTER ( NOT EXISTS {?left bp:memberPhysicalEntity ?lmem } )
-                    FILTER regex(?dbname, "^.*uniprot") }
+                    FILTER regex(?dbleft, "^.*uniprot") }
 
         OPTIONAL { ?right a bp:Protein ;
                           bp:entityReference [ a bp:ProteinReference ;
-                                               bp:xref [ bp:db ?dbname ;
+                                               bp:xref [ bp:db ?dbright ;
                                                          bp:id ?upRefR ] ] .
                     FILTER ( NOT EXISTS {?right bp:memberPhysicalEntity ?rmem } )
-                    FILTER regex(?dbname, "^.*uniprot") }
+                    FILTER regex(?dbright, "^.*uniprot") }
 
         # single genes
         OPTIONAL { ?left a bp:Dna ;
                           bp:entityReference [ a bp:DnaReference ;
-                                               bp:xref [ bp:db ?dbname ;
+                                               bp:xref [ bp:db ?dbleft ;
                                                          bp:id ?upDnaRefL] ]
                     FILTER regex(?dbname, "^.*uniprot") }
 
         OPTIONAL { ?right a bp:Dna ;
                           bp:entityReference [ a bp:DnaReference ;
-                                               bp:xref [ bp:db ?dbname ;
+                                               bp:xref [ bp:db ?dbright ;
                                                          bp:id ?upDnaRefR] ]
                     FILTER regex(?dbname, "^.*uniprot") }
 
         # gene family
         OPTIONAL { ?left a bp:Dna ;
                           bp:entityReference/bp:memberEntityReference/bp:xref [ a bp:RelationshipXref ;
-                                                                                bp:db ?dbname ;
+                                                                                bp:db ?dbleft ;
                                                                                 bp:id ?upDnaRefL]
                           FILTER regex(?dbname, "^.*uniprot") }
 
         OPTIONAL { ?right a bp:Dna ;
                           bp:entityReference/bp:memberEntityReference/bp:xref [ a bp:RelationshipXref ;
-                                                                                bp:db ?dbname ;
+                                                                                bp:db ?dbright ;
                                                                                 bp:id ?upDnaRefR]
                           FILTER regex(?dbname, "^.*uniprot") }
         {
-            SELECT ?pw ?pathname ?pc ?ctype
+            SELECT ?pw ?pathname ?interactionPathComp ?interactionType
                     ?left ?right ?ltype ?rtype ?llocref ?rlocref
-                    ?cltype ?controller ?transcriptionController
+                    ?cltype ?ctrlEntity ?interactionCtrl
             WHERE {
                 {# the actual values of left and right (we will not recognize "left side DNA" in downstream calculations)
                     ?pw bp:name ?pathname ;
-                        bp:pathwayComponent* ?pc .
+                        bp:pathwayComponent* ?interactionPathComp .
                      # VALUES ?pw {<http://identifiers.org/reactome/R-HSA-2122948>
                      #             <http://identifiers.org/reactome/R-HSA-2122947>}
                     VALUES ?pw $pathVals
 
-                    ?pc a ?ctype .
-                    ?pc a bp:Interaction .
-                    ?left ^bp:left ?pc ;
+                    ?interactionPathComp a ?interactionType .
+                    ?interactionPathComp a bp:Interaction .
+                    ?left ^bp:left ?interactionPathComp ;
                            a ?ltype ;
                            bp:cellularLocation [ bp:term ?lloc ;
                                                  bp:xref ?llocref ] ;
                            bp:displayName ?lname .
-                    ?right ^bp:right ?pc ;
+                    ?right ^bp:right ?interactionPathComp ;
                            a ?rtype ;
                            bp:cellularLocation [ bp:term ?rloc ;
                                                  bp:xref ?rlocref ] ;
                            bp:displayName ?rname .
-                    OPTIONAL { ?pc ^bp:controlled [ bp:controlType ?cltype ;
-                                                    bp:controller ?controller ]}
+                    OPTIONAL { ?interactionPathComp ^bp:controlled [ bp:controlType ?cltype ;
+                                                    bp:controller ?ctrlEntity ]}
                     VALUES ?rtype {bp:Protein bp:Complex}
                     VALUES ?ltype {bp:Protein bp:Complex} }
                 UNION
                 {# we count reactions where left2 is dna, left2 is an activator complex, and right is the trans init complex, then report a new reaction where left is the trans init complex and right is the protein encoded by the gene
                     ?pw bp:name ?pathname ;
-                        bp:pathwayComponent* ?pc .
+                        bp:pathwayComponent* ?interactionPathComp .
                      # VALUES ?pw {<http://identifiers.org/reactome/R-HSA-2122948>
                      #             <http://identifiers.org/reactome/R-HSA-2122947>}
 
                     VALUES ?pw $pathVals
 
-                    ?pc a ?ctype .
-                    ?pc a bp:BiochemicalReaction ; # identify the controlling complex for a transcriptional event
+                    ?interactionPathComp a ?interactionType .
+                    ?interactionPathComp a bp:BiochemicalReaction ; # identify the controlling complex for a transcriptional event
                         bp:left ?right ;
                         ^bp:controlled [ a bp:Control ;
                                          bp:controlType ?cltype ;
                                          bp:controller ?left ;
                                          bp:xref [ a bp:UnificationXref ;
-                                                   bp:db ?dbname ;
-                                                   bp:id ?transcriptionController ] ] .
+                                                   bp:id ?interactionCtrl ] ] .
                     ?left a ?ltype ;
                            bp:cellularLocation [ bp:term ?lloc ;
                                                  bp:xref ?llocref ] .
@@ -129,10 +168,11 @@ function path_pc(pathVals::String)
 
                     VALUES ?rtype {bp:Protein}
                     VALUES ?ltype {bp:Protein bp:Complex} }
-                    VALUES ?ctype {bp:BiochemicalReaction} } }
+                    VALUES ?interactionType {bp:BiochemicalReaction} } }
+        #FILTER(BOUND(?dbleft) && BOUND(?dbright))
     }
 
-    GROUP BY ?left ?right ?pw ?pathname ?pc ?ctype ?ltype ?rtype ?llocref ?rlocref ?cltype ?controller ?transcriptionController ?cxRefL ?cxRefR ?upRefL ?upRefR ?upDnaRefL ?upDnaRefR
+    GROUP BY ?left ?right ?pw ?pathname ?interactionPathComp ?interactionType ?ltype ?rtype ?llocref ?rlocref ?cltype ?ctrlEntity ?interactionCtrl ?cxRefL ?cxRefR ?upRefL ?upRefR ?upDnaRefL ?upDnaRefR ?dbleft ?dbright
     """
 end
 
@@ -144,7 +184,7 @@ function path_pc_recurse(pathVals::String)
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
     PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
 
-    SELECT DISTINCT ?left ?right ?pw ?pathname ?pc ?ctype ?ltype ?rtype ?llocref ?rlocref ?cltype ?controller ?transcriptionController ?cxRefL ?cxRefR ?upRefL ?upRefR ?upDnaRefL ?upDnaRefR
+    SELECT DISTINCT ?left ?right ?pw ?pathname ?interactionPathComp ?interactionType ?ltype ?rtype ?llocref ?rlocref ?cltype ?ctrlEntity ?interactionCtrl ?cxRefL ?cxRefR ?upRefL ?upRefR ?upDnaRefL ?upDnaRefR
     (GROUP_CONCAT(?cxPrimaryProtL; SEPARATOR = ",") AS ?cxPrimaryProtLcat)
     (GROUP_CONCAT(?cxPrimaryProtR; SEPARATOR = ",") AS ?cxPrimaryProtRcat)
     (GROUP_CONCAT(?cxPrimaryProtLocL; SEPARATOR = ",") AS ?cxPrimaryProtLocLcat)
@@ -276,31 +316,31 @@ function path_pc_recurse(pathVals::String)
     																																						bp:id ?upDnaRefR]
     											FILTER regex(?dbname, "^.*uniprot") }
     		{
-    				SELECT ?pw ?pathname ?pc ?ctype
+    				SELECT ?pw ?pathname ?interactionPathComp ?interactionType
     								?left ?right ?ltype ?rtype ?llocref ?rlocref
-    								?cltype ?controller ?transcriptionController
+    								?cltype ?ctrlEntity ?interactionCtrl
     				WHERE {
     						{# the actual values of left and right (we will not recognize "left side DNA" in downstream calculations)
     								?pw bp:name ?pathname ;
-    										bp:pathwayComponent* ?pc .
+    										bp:pathwayComponent* ?interactionPathComp .
     									VALUES ?pw {<http://identifiers.org/reactome/R-HSA-2122948>
     															<http://identifiers.org/reactome/R-HSA-2122947>}
     #                    VALUES ?pw $pathVals
 
-    								?pc a ?ctype .
-    								?pc a bp:Interaction .
-    								?left ^bp:left ?pc ;
+    								?interactionPathComp a ?interactionType .
+    								?interactionPathComp a bp:Interaction .
+    								?left ^bp:left ?interactionPathComp ;
     											 a ?ltype ;
     											 bp:cellularLocation [ bp:term ?lloc ;
     																						 bp:xref ?llocref ] ;
     											 bp:displayName ?lname .
-    								?right ^bp:right ?pc ;
+    								?right ^bp:right ?interactionPathComp ;
     											 a ?rtype ;
     											 bp:cellularLocation [ bp:term ?rloc ;
     																						 bp:xref ?rlocref ] ;
     											 bp:displayName ?rname .
-    								OPTIONAL { ?pc ^bp:controlled [ bp:controlType ?cltype ;
-    																								bp:controller ?controller ]}
+    								OPTIONAL { ?interactionPathComp ^bp:controlled [ bp:controlType ?cltype ;
+    																								bp:controller ?ctrlEntity ]}
     								VALUES ?rtype {bp:Protein bp:Complex}
     								VALUES ?ltype {bp:Protein bp:Complex}
     #                    VALUES ?rtype {bp:Complex}
@@ -309,21 +349,21 @@ function path_pc_recurse(pathVals::String)
     						UNION
     						{# count reactions where left2 is dna, left2 is an activator complex, and right is the trans init complex, then report a new reaction where left is the trans init complex and right is the protein encoded by the gene
     								?pw bp:name ?pathname ;
-    										bp:pathwayComponent* ?pc .
+    										bp:pathwayComponent* ?interactionPathComp .
     									VALUES ?pw {<http://identifiers.org/reactome/R-HSA-2122948>
     															<http://identifiers.org/reactome/R-HSA-2122947>}
 
     #                    VALUES ?pw $pathVals
 
-    								?pc a ?ctype .
-    								?pc a bp:BiochemicalReaction ; # identify the controlling complex for a transcriptional event
+    								?interactionPathComp a ?interactionType .
+    								?interactionPathComp a bp:BiochemicalReaction ; # identify the controlling complex for a transcriptional event
     										bp:left ?right ;
     										^bp:controlled [ a bp:Control ;
     																		 bp:controlType ?cltype ;
     																		 bp:controller ?left ;
     																		 bp:xref [ a bp:UnificationXref ;
     																							 bp:db ?dbname ;
-    																							 bp:id ?transcriptionController ] ] .
+    																							 bp:id ?interactionCtrl ] ] .
     								?left a ?ltype ;
     											 bp:cellularLocation [ bp:term ?lloc ;
     																						 bp:xref ?llocref ] .
@@ -334,12 +374,12 @@ function path_pc_recurse(pathVals::String)
 
     								VALUES ?rtype {bp:Protein}
     								VALUES ?ltype {bp:Protein bp:Complex} }
-    								VALUES ?ctype {bp:BiochemicalReaction} } }
+    								VALUES ?interactionType {bp:BiochemicalReaction} } }
 
     #    FILTER ( !BOUND( ?cxPrimaryProtR ) )
     }
 
-    GROUP BY ?left ?right ?pw ?pathname ?pc ?ctype ?ltype ?rtype ?llocref ?rlocref ?cltype ?controller ?transcriptionController ?cxRefL ?cxRefR ?upRefL ?upRefR ?upDnaRefL ?upDnaRefR
+    GROUP BY ?left ?right ?pw ?pathname ?interactionPathComp ?interactionType ?ltype ?rtype ?llocref ?rlocref ?cltype ?ctrlEntity ?interactionCtrl ?cxRefL ?cxRefR ?upRefL ?upRefR ?upDnaRefL ?upDnaRefR
     """
 end
 

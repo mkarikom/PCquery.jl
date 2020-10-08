@@ -10,6 +10,7 @@ HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
 LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
 MetaGraphs = "626554b9-1ddb-594c-aa3c-2596fe9399a5"
+Mustache = "ffc61752-8dc7-55ee-8c37-f3e9cdd09e70"
 
 [compat]
 julia = "1"
