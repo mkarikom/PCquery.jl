@@ -23,4 +23,5 @@ include("Search.jl") # run http request against pc
 include("Sparql.jl") # sparql tools for various endpoints
 include("Graph.jl") # find paths
 include("Queries.jl") # sample queries
+include("Pathways.jl") # helper functions for pathway-related sparql
 end

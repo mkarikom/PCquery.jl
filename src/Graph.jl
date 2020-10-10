@@ -136,50 +136,97 @@ end
 
 # initialize a bipartite graph where {left,right,control} ʌ {interactions} = ∅
 # for edge [1,2], direction is 1->2.  define: [left,interaction], [interaction,right], [ctrl,interaction]
-function initBpGraph(df::DataFrame,
-					pw::Symbol,
-					lRef::Symbol,rRef::Symbol,ctrlRef::Symbol,rxn::Symbol,
-					lRefType::Symbol,rRefType::Symbol,ctrlRefType::Symbol,
-					lType::Symbol,rType::Symbol,ctrlType::Symbol,rxnType::Symbol,
-					lLoc::Symbol,rLoc::Symbol,ctrlLoc::Symbol)
+function initBpGraph(df::DataFrame,pw::Symbol,nestedParams,
+					 participantLocRef::Symbol,participantType::Symbol,participantRefs::Symbol,participantRefTypes::Symbol,
+					 partPred::Symbol,intRef::Symbol,intType::Symbol,
+					 ctrlLocRef::Symbol,ctrlRxn::Symbol,ctrlRxnType::Symbol,ctrlRxnDir::Symbol,
+					 ctrlEntityType::Symbol,ctrlEntityRefs::Symbol,ctrlEntityRefTypes::Symbol)
 	len = size(df,1)
-	lnodes = []
-	rnodes = []
-	allpairs = sort(collect(skipmissing(unique(vcat(
-				df[!,lRef],df[!,rRef],df[!,rxn],df[!,ctrlRef])))))
-
+	# collect verts
+	inds=[];rxns=[];participants=[];preds=[];ctrlRxns=[];ctrlParticipants=[]
+	# criteria for each nested entity
+	simpleF = r->occursin("Unification",r)
+	nestedF = r->!occursin("Unification",r)
+	# criteria for participant edge direction
+	edgeSym = partPred
+	symOut = "http://www.biopax.org/release/biopax-level3.owl#left"
+	symIn = "http://www.biopax.org/release/biopax-level3.owl#right"
 	for i in 1:len
-		# lRef vertex
-		l = df[!,lRef][i]
-		l_ind = findfirst(n->n==l,allnodes)
-		set_props!(g, l_ind, Dict(:type=>df[!,lType][i], :location =>df[!,lLoc][i]))
-
-		# rRef vertex
-		r = df[!,rRef][i]
-		r_ind = findfirst(n->n==r,allnodes)
-		set_props!(g, r_ind, Dict(:type=>df[!,rType][i], :location =>df[!,rLoc][i]))
-
-		# l/r edge properies
-		rx = df[!,rxn][i]
-		rx_ind = findfirst(n->n==rx,allnodes)
-		add_edge!(g,l_ind,rx_ind)
-		add_edge!(g,rx_ind,r_ind)
-		set_prop!(g, Edge(l_ind, rx_ind), :interaction, df[!,rxnType][i])
-		set_prop!(g, Edge(rx_ind, r_ind), :interaction, df[!,rxnType][i])
-
-		# optional ctrlRef vertex and edge properties
-		if !ismissing(df[!,ctrlRef][i])
-			ct = df[!,ctrlRef][i]
-			ct_ind = findfirst(n->n==ct,allnodes)
-			set_props!(g, ct_ind, Dict(:type=>df[!,ctrlType][i], :location =>df[!,ctrlLoc][i]))
-			add_edge!(g,ct_ind,rx_ind)
-			set_prop!(g, Edge(ct_ind, rx_ind), :interaction, df[!,ctrlType][i])
+		p_nested = getNested(df,nestedParams,i,
+						simpleF,nestedF,
+						participantRefTypes,participantRefs)
+		for ii in 1:length(p_nested)
+			p_i=p_nested[ii]
+			if !ismissing(df[!,ctrlRxn][i])
+				c_nested = getNested(df,nestedParams,i,
+								simpleF,nestedF,
+								ctrlEntityRefTypes,ctrlEntityRefs)
+				for iii in 1:length(c_nested)
+					c_i = c_nested[iii]
+					push!(ctrlParticipants,c_i)
+					push!(ctrlRxns,df[!,ctrlRxn][i])
+					push!(inds,i)
+					push!(participants,p_i)
+					push!(rxns,df[!,intRef][i])
+					push!(preds,df[!,edgeSym][i])
+				end
+			else
+				push!(ctrlParticipants,missing)
+				push!(ctrlRxns,missing)
+				push!(inds,i)
+				push!(participants,p_i)
+				push!(rxns,df[!,intRef][i])
+				push!(preds,df[!,edgeSym][i])
+			end
 		end
 	end
 
 
-	g = MetaDiGraph(length(allnodes))
-	return Dict(:g=>g,:allnodes=>allnodes)
+	allverts = sortUnique(rxns,participants,ctrlRxns,ctrlParticipants)
+	g = MetaDiGraph(length(allverts))
+
+	for i in 1:length(inds)
+		ind = inds[i]
+		# participants
+		p_ind = findfirst(n->n==participants[i],allverts)
+		set_props!(g, p_ind, Dict(:reactome=>participants[i],
+								  :entityType=>df[!,participantType][inds[i]],
+								  :location=>df[!,participantLocRef][inds[i]]))
+
+		rx_ind = findfirst(n->n==rxns[i],allverts)
+		set_props!(g,rx_ind,Dict(:reactome=>rxns[i],
+								  :entityType=>df[!,intType][inds[i]]))
+
+		if preds[i] == symIn
+			add_edge!(g,p_ind,rx_ind)
+		elseif preds[i] == symOut
+			add_edge!(g,rx_ind,p_ind)
+		else
+			throw("only left/right reactions are supported")
+		end
+
+		# optional ctrlRef vertex and edge properties
+		if !ismissing(ctrlRxns[i])
+			if ismissing(df[!,ctrlRxnDir][inds[i]])
+				throw("ctrl rxn dir missing")
+			end
+			ct = ctrlParticipants[i]
+			ct_rx = ctrlRxns[i]
+			ct_ind = findfirst(n->n==ct,allverts)
+			ct_rx_ind = findfirst(n->n==ct_rx,allverts)
+			set_props!(g, ct_ind, Dict(:reactome=>ctrlParticipants[i],
+									   :entityType=>df[!,ctrlEntityType][inds[i]],
+									   :location=>df[!,ctrlLocRef][inds[i]]))
+
+			set_props!(g, ct_rx_ind, Dict(:reactome=>ctrlRxns[i],
+									   	  :entityType=>df[!,ctrlRxnType][inds[i]],
+										  :controlType=>df[!,ctrlRxnDir][inds[i]]))
+
+			add_edge!(g,ct_ind,ct_rx_ind)
+			add_edge!(g,ct_rx_ind,rx_ind)
+		end
+	end
+	Dict(:graph=>g,:vertices=>allverts)
 end
 
 function getAllPaths(paths,startnodes,endnodes)
@@ -196,4 +243,14 @@ function getAllPaths(paths,startnodes,endnodes)
 		end
 	end
 	foundpaths
+end
+
+function collectVertex!(refereceVec::Vector,
+					   vertexRef::String)
+   ind = findfirst(n->n==vertexRef,refereceVec)
+   if isnothing(ind)
+	   push!(referenceVec,vertexRef)
+	   ind = length(referenceVec)
+   end
+   ind
 end

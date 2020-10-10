@@ -1,12 +1,12 @@
 
-function delimitValues(iris::Vector{String},domain::String,wrap::String)
+function delimitValues(iris::Vector,domain::String,wrap::String)
 	xs = string.(wrap[1],domain,iris,wrap[2])
 	xs = join(xs," ")
 	xs = "{$xs}"
 	xs = "$xs"
 end
 
-function delimitValues(iris::Vector{String},domain::String)
+function delimitValues(iris::Vector,domain::String)
 	xs = string.(domain,iris)
 	xs = join(xs," ")
 	xs = "{$xs}"
