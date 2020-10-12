@@ -136,97 +136,97 @@ end
 
 # initialize a bipartite graph where {left,right,control} ʌ {interactions} = ∅
 # for edge [1,2], direction is 1->2.  define: [left,interaction], [interaction,right], [ctrl,interaction]
-function initBpGraph(df::DataFrame,pw::Symbol,nestedParams,
-					 participantLocRef::Symbol,participantType::Symbol,participantRefs::Symbol,participantRefTypes::Symbol,
-					 partPred::Symbol,intRef::Symbol,intType::Symbol,
-					 ctrlLocRef::Symbol,ctrlRxn::Symbol,ctrlRxnType::Symbol,ctrlRxnDir::Symbol,
-					 ctrlEntityType::Symbol,ctrlEntityRefs::Symbol,ctrlEntityRefTypes::Symbol)
+function initBpGraph(df::DataFrame,nestedParams,dataKeys,ctrlKeys)
 	len = size(df,1)
 	# collect verts
-	inds=[];rxns=[];participants=[];preds=[];ctrlRxns=[];ctrlParticipants=[]
-	# criteria for each nested entity
-	simpleF = r->occursin("Unification",r)
-	nestedF = r->!occursin("Unification",r)
+	allKeys = vcat(dataKeys,ctrlKeys)
+	colnames = [:ind,vcat(map(k->nestedParams[k],allKeys)...)...]
+	coltypes = fill(Union{Missing,String},length(colnames))
+	coltypes[1] = Union{Missing,Int64}
+	int_df = DataFrame(coltypes,colnames)
+
 	# criteria for participant edge direction
-	edgeSym = partPred
 	symOut = "http://www.biopax.org/release/biopax-level3.owl#left"
 	symIn = "http://www.biopax.org/release/biopax-level3.owl#right"
 	for i in 1:len
-		p_nested = getNested(df,nestedParams,i,
-						simpleF,nestedF,
-						participantRefTypes,participantRefs)
-		for ii in 1:length(p_nested)
-			p_i=p_nested[ii]
-			if !ismissing(df[!,ctrlRxn][i])
-				c_nested = getNested(df,nestedParams,i,
-								simpleF,nestedF,
-								ctrlEntityRefTypes,ctrlEntityRefs)
-				for iii in 1:length(c_nested)
-					c_i = c_nested[iii]
-					push!(ctrlParticipants,c_i)
-					push!(ctrlRxns,df[!,ctrlRxn][i])
-					push!(inds,i)
-					push!(participants,p_i)
-					push!(rxns,df[!,intRef][i])
-					push!(preds,df[!,edgeSym][i])
+
+		p_nested = getNested(nestedParams,df[i,:participant])
+		if hasCol(p_nested,nestedParams[:simpleEntity][1])
+			pTerms = vcat(map(k->nestedParams[k],dataKeys[[3,4]])...)
+		else
+			pTerms =vcat(map(k->nestedParams[k],dataKeys[[3]])...)
+		end
+		for ii in 1:size(p_nested,1)
+			if !ismissing(df[i,nestedParams[:ctrlInteraction][1]])
+				baseTerms = vcat(map(k->nestedParams[k],dataKeys[[1,2]])...)
+				c_nested = getNested(nestedParams,df[i,:ctrlEntity])
+				if hasCol(c_nested,nestedParams[:simpleEntity][1])
+					cTerms =vcat(map(k->nestedParams[k],dataKeys[[3,4]])...)
+					cColNames =vcat(map(k->nestedParams[k],ctrlKeys[[1,2]])...)
+				else
+					cTerms =vcat(map(k->nestedParams[k],dataKeys[[3]])...)
+					cColNames =vcat(map(k->nestedParams[k],ctrlKeys[[1]])...)
+				end
+				for iii in 1:size(c_nested,1)
+					data = tuple(i,collect(df[i,baseTerms])...,
+									collect(p_nested[ii,pTerms])...,
+									collect(c_nested[iii,cTerms])...)
+					push!(int_df,initRow(
+							colnames,
+							[:ind,vcat(baseTerms,pTerms,cColNames)...],
+							data))
 				end
 			else
-				push!(ctrlParticipants,missing)
-				push!(ctrlRxns,missing)
-				push!(inds,i)
-				push!(participants,p_i)
-				push!(rxns,df[!,intRef][i])
-				push!(preds,df[!,edgeSym][i])
+				baseTerms = vcat(map(k->nestedParams[k],dataKeys[[1]])...)
+				data = tuple(i,collect(df[i,baseTerms])...,
+								collect(p_nested[ii,pTerms])...)
+				push!(int_df,initRow(
+						colnames,
+						[:ind,vcat(baseTerms,pTerms)...],
+						data))
 			end
 		end
 	end
-
-
-	allverts = sortUnique(rxns,participants,ctrlRxns,ctrlParticipants)
+	allverts = sortUnique(int_df[!,:participantRef],int_df[!,:interaction],
+							int_df[!,:ctrlEntityRef],int_df[!,:ctrlRxn])
 	g = MetaDiGraph(length(allverts))
 
-	for i in 1:length(inds)
-		ind = inds[i]
+	for i in 1:size(int_df,1)
 		# participants
-		p_ind = findfirst(n->n==participants[i],allverts)
-		set_props!(g, p_ind, Dict(:reactome=>participants[i],
-								  :entityType=>df[!,participantType][inds[i]],
-								  :location=>df[!,participantLocRef][inds[i]]))
+		p_ind = findfirst(n->n==int_df[i,:participantRef],allverts)
+		set_props!(g, p_ind, Dict(:unification=>int_df[i,:participantRef],
+								  :entityType=>int_df[i,:participantType],
+								  :location=>int_df[i,:participantLocRef]))
 
-		rx_ind = findfirst(n->n==rxns[i],allverts)
-		set_props!(g,rx_ind,Dict(:reactome=>rxns[i],
-								  :entityType=>df[!,intType][inds[i]]))
+		rx_ind = findfirst(n->n==int_df[i,:interaction],allverts)
+		set_props!(g,rx_ind,Dict(:unification=>int_df[i,:interaction],
+								  :entityType=>int_df[i,:intType]))
 
-		if preds[i] == symIn
+		if int_df[i,:partPred] == symIn
 			add_edge!(g,p_ind,rx_ind)
-		elseif preds[i] == symOut
+		elseif int_df[i,:partPred] == symOut
 			add_edge!(g,rx_ind,p_ind)
 		else
 			throw("only left/right reactions are supported")
 		end
 
 		# optional ctrlRef vertex and edge properties
-		if !ismissing(ctrlRxns[i])
-			if ismissing(df[!,ctrlRxnDir][inds[i]])
-				throw("ctrl rxn dir missing")
-			end
-			ct = ctrlParticipants[i]
-			ct_rx = ctrlRxns[i]
-			ct_ind = findfirst(n->n==ct,allverts)
-			ct_rx_ind = findfirst(n->n==ct_rx,allverts)
-			set_props!(g, ct_ind, Dict(:reactome=>ctrlParticipants[i],
-									   :entityType=>df[!,ctrlEntityType][inds[i]],
-									   :location=>df[!,ctrlLocRef][inds[i]]))
+		if !ismissing(int_df[i,:ctrlRxn])
+			ct_ind = findfirst(n->n==int_df[i,:ctrlEntityRef],allverts)
+			ct_rx_ind = findfirst(n->n==int_df[i,:ctrlRxn],allverts)
+			set_props!(g, ct_ind, Dict(:unification=>int_df[i,:ctrlEntityRef],
+									   :entityType=>int_df[i,:ctrlEntityType],
+									   :location=>int_df[i,:ctrlEntityLocRef]))
 
-			set_props!(g, ct_rx_ind, Dict(:reactome=>ctrlRxns[i],
-									   	  :entityType=>df[!,ctrlRxnType][inds[i]],
-										  :controlType=>df[!,ctrlRxnDir][inds[i]]))
+			set_props!(g, ct_rx_ind, Dict(:unification=>int_df[i,:ctrlRxn],
+									   	  :entityType=>int_df[i,:ctrlEntityRef],
+										  :controlType=>int_df[i,:ctrlRxnType]))
 
 			add_edge!(g,ct_ind,ct_rx_ind)
 			add_edge!(g,ct_rx_ind,rx_ind)
 		end
 	end
-	Dict(:graph=>g,:vertices=>allverts)
+	Dict(:graph=>g,:vertices=>allverts,:simple=>int_df)
 end
 
 function getAllPaths(paths,startnodes,endnodes)

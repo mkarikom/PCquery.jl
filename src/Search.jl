@@ -8,7 +8,7 @@ function makeUnions(types::Vector{DataType})
 end
 
 # get the row-dictionary to add to the df
-function initRow(allkeys::Vector{Symbol},dkeys::Vector{Symbol},data::Vector)
+function initRow(allkeys::Vector{Symbol},dkeys::Vector{Symbol},data::Tuple)
     tuples = []
     for k in 1:length(allkeys)
         ind = findfirst(x->x==allkeys[k],dkeys)
@@ -46,7 +46,7 @@ function resultData(xmlRoot::XMLElement)
         keys = Symbol.(name.(hit))
         data = content.(hit)
         # tdata = initRow(colnames,keys,data)
-        tdata = initRow(colnames,keys,data)
+        tdata = initRow(colnames,keys,tuple(data...))
         push!(df,tdata)
     end
     df
@@ -99,10 +99,41 @@ function getXMLres(node)
             end
         end
         if length(node_data) > 0
-            push!(df,initRow(colnames,Symbol.(node_names),node_data))
+            push!(df,initRow(colnames,Symbol.(node_names),tuple(node_data...)))
         end
     end end end end
     df
+end
+
+function getXMLres!(node,df)
+    dkeys = getNames(node)
+    colnames = Symbol.(dkeys)
+    counter = 1
+    for c in child_nodes(node)  # c is an instance of XMLNode
+    if is_elementnode(c)
+    if name(XMLElement(c)) == "results"
+    for res in child_nodes(c)
+        counter += 1
+        # println(counter)
+        node_data = []
+        node_names = []
+        for cres in child_nodes(res)  # c is an instance of XMLNode
+            if is_elementnode(cres)
+                e = XMLElement(cres)  # this makes an XMLElement instance
+                for a in attributes(e)  # a is an instance of XMLAttr
+                    n = name(a)
+                    v = value(a)
+                    cont = content(e)
+                    push!(node_data,Base.strip(cont))
+                    push!(node_names,Base.strip(v))
+                    # println("$v = $cont")
+                end
+            end
+        end
+        if length(node_data) > 0
+            push!(df,initRow(colnames,Symbol.(node_names),tuple(node_data...)))
+        end
+    end end end end
 end
 
 function indexFeature(flist::Vector,fname::Symbol,

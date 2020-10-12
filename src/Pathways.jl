@@ -1,33 +1,52 @@
-function getNested(df::DataFrame,dbParams::Dict,ind::Int,
-                    simpleF::Function,nestedF::Function,
-                    refTypes::Symbol,refs::Symbol)
-    nestedRefInd = findall(nestedF,df[!,refTypes][ind])
-    simpleRefInd = findall(simpleF,df[!,refTypes][ind])
-    refList = []
-    if length(nestedRefInd) == length(df[!,refTypes][ind])
-        ref = df[!,refs][ind][nestedRefInd]
-        vals = delimitValues(ref,"","<>")
-        srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
-        rqDir = string(srcDir,"/rq")
-        str = open(f->read(f, String), "$rqDir/getNested.rq");
-        turtle = Mustache.render(str,
-                Dict{Any,Any}("entity"=>vals))
+function getNested(dbParams::Dict,entity::String)
+    val = delimitValues([entity],"","<>")
+    srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
+    rqDir = string(srcDir,"/rq")
+    str = open(f->read(f, String), "$rqDir/getNestedFull.rq");
+    turtle = Mustache.render(str,
+            Dict{Any,Any}("ent"=>val))
 
-        # compose the header and execute query
-        header = ["Content-Type" => "application/x-www-form-urlencoded",
-                  "Accept" => "application/sparql-results+xml"]
-        fmt = "application/sparql-results+xml"
-        resp = PCquery.requestTTL(7200,"http",fmt,
-                            dbParams[:host],dbParams[:path],:POST,
-                            header,turtle)
-        members = parseSparqlResponse(resp)
-        push!(refList,collect(skipmissing(members[!,dbParams[:member]]))...)
-        @assert all(map(simpleF,refList))
-    else
-        @assert length(simpleRefInd)==1 "only 1 simple ref is allowed"
-        push!(refList,df[!,refs][ind][simpleRefInd]...)
+    # compose the header and execute query
+    header = ["Content-Type" => "application/x-www-form-urlencoded",
+              "Accept" => "application/sparql-results+xml"]
+    fmt = "application/sparql-results+xml"
+    resp = PCquery.requestTTL(dbParams[:port],"http",fmt,
+                        dbParams[:host],dbParams[:path],:POST,
+                        header,turtle)
+    members = parseSparqlResponse(resp)
+    reflist = members
+    @assert size(reflist,1) > 0 "require at least one simple ref"
+    reflist
+end
+
+function hasCol(df::DataFrame,testKey::Symbol)
+    cx = true
+    if isnothing(findfirst(n->n==string(testKey),names(df)))
+        cx = false
     end
-    refList
+    cx
+end
+
+function getXref(dbParams::Dict,xrefs::Vector)
+    colnames = dbParams[:fields]
+    coltypes = fill(Union{Missing,String},length(colnames))
+    df = DataFrame(coltypes,colnames)
+    vals = delimitValues(xrefs,"","<>")
+    srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
+    rqDir = string(srcDir,"/rq")
+    str = open(f->read(f, String), "$rqDir/getXref.rq");
+    turtle = Mustache.render(str,
+            Dict{Any,Any}("xref"=>vals))
+
+    # compose the header and execute query
+    header = ["Content-Type" => "application/x-www-form-urlencoded",
+              "Accept" => "application/sparql-results+xml"]
+    fmt = "application/sparql-results+xml"
+    resp = PCquery.requestTTL(dbParams[:port],"http",fmt,
+                        dbParams[:host],dbParams[:path],:POST,
+                        header,turtle)
+    parseSparqlResponse!(resp,df)
+    df
 end
 
 function sortUnique(cols...)

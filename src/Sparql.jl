@@ -113,3 +113,10 @@ function parseSparqlResponse(resp::HTTP.Messages.Response)
 	xroot = LightXML.root(xdoc)
 	results = PCquery.getXMLres(xroot)
 end
+
+function parseSparqlResponse!(resp::HTTP.Messages.Response,df)
+	resp_str = String(resp.body);
+	xdoc = LightXML.parse_string(resp_str)
+	xroot = LightXML.root(xdoc)
+	results = PCquery.getXMLres!(xroot,df)
+end
