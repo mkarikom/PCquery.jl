@@ -17,6 +17,7 @@ WHERE
 
     VALUES ?entity {{{ent}}}
     {
+				# entity is nested
         ?participant ^bp:memberPhysicalEntity ?entity ;
         		a ?participantType ;
                 bp:xref ?participantRef ;
@@ -29,12 +30,12 @@ WHERE
                 ?participant bp:entityReference ?participantEntRef .
             	?participantEntRef a ?participantEntRefType ;
                                        bp:xref [ a bp:UnificationXref ;
-                                                 bp:id ?entId;
-																								 bp:db ?entIdDb ] .
+                                                 bp:id ?entId ] .
         }
     }
 	UNION
     {
+				# entity is simple without dna reference
         ?entity a ?participantType ;
                 bp:xref ?participantRef ;
                 bp:cellularLocation [ bp:xref ?participantLocRef ] .
@@ -46,8 +47,7 @@ WHERE
                 ?entity bp:entityReference ?participantEntRef .
             	?participantEntRef a ?participantEntRefType ;
                                        bp:xref [ a bp:UnificationXref ;
-                                                 bp:id ?entId ;
-																								 bp:db ?entIdDb ] .
+                                                 bp:id ?entId ] .
         }
     }
 
