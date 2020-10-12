@@ -1,3 +1,21 @@
+function getPathways(dbParams::Dict)
+    val = delimitValues(dbParams[:refs],"")
+    srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
+    rqDir = string(srcDir,"/rq")
+    str = open(f->read(f, String), "$rqDir/pc_f0_path_gdb.rq");
+    turtle = Mustache.render(str,Dict{Any,Any}("pathVals"=>val))
+
+    # compose the header and execute query
+    header = ["Content-Type" => "application/x-www-form-urlencoded",
+    		  "Accept" => "application/sparql-results+xml"]
+    fmt = "application/sparql-results+xml"
+    host = "192.168.1.3"
+    resp = PCquery.requestTTL(dbParams[:port],"http",fmt,
+                        dbParams[:host],dbParams[:path],:POST,
+                        header,turtle)
+    df_pairs = PCquery.parseSparqlResponse(resp)
+end
+
 function getNested(dbParams::Dict,entity::String)
     val = delimitValues([entity],"","<>")
     srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
@@ -27,28 +45,6 @@ function hasCol(df::DataFrame,testKey::Symbol)
     cx
 end
 
-function getXref(dbParams::Dict,xrefs::Vector)
-    colnames = dbParams[:fields]
-    coltypes = fill(Union{Missing,String},length(colnames))
-    df = DataFrame(coltypes,colnames)
-    vals = delimitValues(xrefs,"","<>")
-    srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
-    rqDir = string(srcDir,"/rq")
-    str = open(f->read(f, String), "$rqDir/getXref.rq");
-    turtle = Mustache.render(str,
-            Dict{Any,Any}("xref"=>vals))
-
-    # compose the header and execute query
-    header = ["Content-Type" => "application/x-www-form-urlencoded",
-              "Accept" => "application/sparql-results+xml"]
-    fmt = "application/sparql-results+xml"
-    resp = PCquery.requestTTL(dbParams[:port],"http",fmt,
-                        dbParams[:host],dbParams[:path],:POST,
-                        header,turtle)
-    parseSparqlResponse!(resp,df)
-    df
-end
-
 function sortUnique(cols...)
     allvert = []
     for c in cols
@@ -62,11 +58,4 @@ function deConcat!(df::DataFrame,expandCols...)
     for c in expandCols
         df[!,c] = split.(df[!,c],",")
     end
-end
-
-# find a tree of complexes, proteins, dna, and small molecules
-function recurseNestedComplexes(dbParams::Dict,
-                       lRef::String,rRef::String,ctrlEntityRef::String,
-                       intRef::String)
-
 end

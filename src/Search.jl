@@ -1,11 +1,4 @@
-# get a vector of Union{Missing,Type} for the df constructor so that rows with missing values can be added
-function makeUnions(types::Vector{DataType})
-    tvec = Union[]
-    for t in 1:length(types)
-        push!(tvec,Union{Missing,types[t]})
-    end
-    tvec
-end
+
 
 # get the row-dictionary to add to the df
 function initRow(allkeys::Vector{Symbol},dkeys::Vector{Symbol},data::Tuple)
@@ -19,37 +12,6 @@ function initRow(allkeys::Vector{Symbol},dkeys::Vector{Symbol},data::Tuple)
         end
     end
     Dict(tuples)
-end
-
-
-function resultData(xmlRoot::XMLElement)
-    ces = collect(child_elements(xmlRoot));
-    # get the column names
-    dkeys = []
-    dtypes = []
-    for c in ces
-        hit = collect(child_elements(c))
-        dkey = name.(hit)
-        dtype = typeof.(content.(hit))
-        push!(dkeys,dkey)
-        push!(dtypes,dtype)
-    end
-    dkeys = reduce(vcat,dkeys)
-    dtypes = reduce(vcat,dtypes)
-    ind = [findfirst(x->x==k,dkeys) for k in unique(dkeys)]
-
-    colnames = Symbol.(dkeys[ind])
-    coltypes = makeUnions(dtypes[ind])
-    df = DataFrame(coltypes,colnames)
-    for c in ces
-        hit = collect(child_elements(c))
-        keys = Symbol.(name.(hit))
-        data = content.(hit)
-        # tdata = initRow(colnames,keys,data)
-        tdata = initRow(colnames,keys,tuple(data...))
-        push!(df,tdata)
-    end
-    df
 end
 
 function getNames(node)
@@ -134,33 +96,4 @@ function getXMLres!(node,df)
             push!(df,initRow(colnames,Symbol.(node_names),tuple(node_data...)))
         end
     end end end end
-end
-
-function indexFeature(flist::Vector,fname::Symbol,
-                      df::DataFrame,offset::Vector)
-    inds = []
-    for r in 1:size(df,1)
-        len = length(df[!,fname][r])
-        urng = len-offset[1]:len-offset[2]
-        ind = findall(x->x==df[!,fname][r][urng],flist)[]
-        push!(inds,ind)
-    end
-    inds
-end
-
-# remove missing values and unpack concatenated vectors
-function cleanMissing(inCol::Vector,pre::Function)
-	outCol = []
-	for n in 1:length(inCol)
-		if !ismissing(inCol[n])
-			if length(inCol[n]) > 0
-				push!(outCol,pre.(vec(split(inCol[n],","))))
-			elseif length(inCol[n]) == 0
-				push!(outCol,missing)
-			end
-		elseif ismissing(inCol[n])
-			push!(outCol,missing)
-		end
-	end
-	outCol
 end
