@@ -1,0 +1,31 @@
+PREFIX wp: <http://vocabularies.wikipathways.org/wp#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
+PREFIX up: <http://purl.uniprot.org/uniprot/>
+PREFIX np: <http://nextprot.org/rdf#>
+PREFIX cv: <http://nextprot.org/rdf/terminology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX unipage: <http://www.uniprot.org/uniprot/>
+
+#SELECT DISTINCT ?uniprot ?goAncestor
+#                (GROUP_CONCAT(DISTINCT ?goTerm;SEPARATOR=",") AS ?goTerms)
+#                (GROUP_CONCAT(DISTINCT ?isoform;SEPARATOR=",") AS ?isoforms)
+#                (GROUP_CONCAT(DISTINCT ?entry;SEPARATOR=",") AS ?entries)
+SELECT DISTINCT *
+
+FROM <http://www.ontotext.com/explicit>
+WHERE {
+        ?entry a np:Entry ;
+               np:swissprotPage ?uniprot ;
+               np:isoform ?isoform .
+        ?isoform np:goMolecularFunction/np:term/np:childOf ?goAncestor ;
+                 np:goMolecularFunction/np:term ?goTerm
+         VALUES ?goAncestor {{{goFilter}}}
+        # VALUES ?goAncestor {<http://nextprot.org/rdf/terminology/GO_0038023>}
+         VALUES ?uniprot {{{entityFilter}}}
+        # VALUES ?uniprot {<http://identifiers.org/uniprot/P46531>}
+}
+#GROUP BY ?uniprot ?goAncestor

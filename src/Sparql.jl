@@ -1,12 +1,12 @@
 
-function delimitValues(iris::Vector{String},domain::String,wrap::String)
+function delimitValues(iris::Vector,domain::String,wrap::String)
 	xs = string.(wrap[1],domain,iris,wrap[2])
 	xs = join(xs," ")
 	xs = "{$xs}"
 	xs = "$xs"
 end
 
-function delimitValues(iris::Vector{String},domain::String)
+function delimitValues(iris::Vector,domain::String)
 	xs = string.(domain,iris)
 	xs = join(xs," ")
 	xs = "{$xs}"
@@ -112,4 +112,11 @@ function parseSparqlResponse(resp::HTTP.Messages.Response)
 	xdoc = LightXML.parse_string(resp_str)
 	xroot = LightXML.root(xdoc)
 	results = PCquery.getXMLres(xroot)
+end
+
+function parseSparqlResponse!(resp::HTTP.Messages.Response,df)
+	resp_str = String(resp.body);
+	xdoc = LightXML.parse_string(resp_str)
+	xroot = LightXML.root(xdoc)
+	results = PCquery.getXMLres!(xroot,df)
 end

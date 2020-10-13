@@ -1,91 +1,150 @@
-function getEdges(edgelist,edgelabels)
-    list = Int.(zeros(length(edgelist)))
-    for n in 1:length(edgelabels)
-        list[findall(x->x==edgelabels[n],edgelist)] .= n
-    end
-    list
-end
-
-function loadGraph(left,right,allnodes)
-    g = SimpleDiGraph(length(allnodes))
-    for i in 1:length(left)
-        add_edge!(g, left[i], right[i]);
-    end
-    g
-end
-
-function mapNodeNames(nodes::Vector,mapping::Dict)
-	out = []
-	# for n in nodes
-	#
-	# end
-end
-# get left,right using the value of surveilance rows to identify:
-# each row will always have a "left" and a "right" (for the head and tail of a pathway these carry special importance)
-# the head of the pathway as a "left" where the surveilance column is "lig_rec_complex"
-# the tail of the pathway as a "right" where the surveilance column is "transcription complex"
-function nodeLabels(df::DataFrame,
-					left::Vector{Symbol},right::Vector{Symbol},
-					leftloc::Vector,rightloc::Vector,
-					keyvals...)
-	# Ex.
-	# keyvals[1] = Dict(:lr=>:left,
-	# 					:key=>:llocref,
-	# 				    :val=>"http://pathwaycommons.org/pc11/#UnificationXref_gene_ontology_GO_0005829")
 
 
+# initialize a bipartite graph where {left,right,control} ʌ {interactions} = ∅
+# for edge [1,2], direction is 1->2.  define: [left,interaction], [interaction,right], [ctrl,interaction]
+function initBpGraph(df::DataFrame,nestedParams,dataKeys,ctrlKeys)
 	len = size(df,1)
-	allpairs = []
-	lnodes = []
-	rnodes = []
-	for r in 1:len
-		lnode = vec(convert(Array,df[!,left][r,:]))
-		lnode = string(lnode[(!ismissing).(lnode)][1])
-		lnode = string(lnode,"-",leftloc[r])
+	# collect verts
+	allKeys = vcat(dataKeys,ctrlKeys)
+	colnames = [:ind,vcat(map(k->nestedParams[k],allKeys)...)...]
+	coltypes = fill(Union{Missing,String},length(colnames))
+	coltypes[1] = Union{Missing,Int64}
+	int_df = DataFrame(coltypes,colnames)
 
-		rnode = vec(convert(Array,df[!,right][r,:]))
-		rnode = string(rnode[(!ismissing).(rnode)][1])
-		rnode = string(rnode,"-",rightloc[r])
+	# criteria for participant edge direction
+	symOut = "http://www.biopax.org/release/biopax-level3.owl#right"
+	symIn = "http://www.biopax.org/release/biopax-level3.owl#left"
+	for i in 1:len
 
-		push!(allpairs,[lnode,rnode])
-		push!(lnodes,lnode)
-		push!(rnodes,rnode)
-	end
-	allnodes = sort(unique(vcat(lnodes,rnodes)))
-
-
-	linds = []
-	rinds = []
-	for l in lnodes
-		push!(linds,findfirst(x->x==l,allnodes))
-	end
-	for r in rnodes
-		push!(rinds,findfirst(x->x==r,allnodes))
-	end
-
-	g = SimpleDiGraph(length(allnodes))
-
-	for n in 1:length(linds)
-		add_edge!(g,linds[n],rinds[n])
-	end
-
-	println(allnodes[1])
-
-	return Dict(:g=>g,:lnodes=>lnodes,:rnodes=>rnodes,:allnodes=>allnodes)
-end
-
-function getAllPaths(paths,startnodes,endnodes)
-	foundpaths = []
-	for startnode in startnodes
-		for endnode in endnodes # start/end pairs
-			for p in paths[startnode]
-				if length(p) > 0
-					if p[1] == startnode && p[end] == endnode
-						push!(foundpaths,p)
+		p_nested = getNested(nestedParams,df[i,:participant])
+		for ii in 1:size(p_nested,1)
+			if hasCol(p_nested,nestedParams[:simpleEntity][1])
+				pTerms = vcat(map(k->nestedParams[k],dataKeys[[3,4]])...)
+			else
+				pTerms =vcat(map(k->nestedParams[k],dataKeys[[3]])...)
+			end
+			if !ismissing(df[i,nestedParams[:ctrlInteraction][1]])
+				baseTerms = vcat(map(k->nestedParams[k],dataKeys[[1,2]])...)
+				c_nested = getNested(nestedParams,df[i,:ctrlEntity])
+				for iii in 1:size(c_nested,1)
+					if hasCol(c_nested,nestedParams[:simpleEntity][1])
+						cTerms =vcat(map(k->nestedParams[k],dataKeys[[3,4]])...)
+						cColNames =vcat(map(k->nestedParams[k],ctrlKeys[[1,2]])...)
+					else
+						cTerms =vcat(map(k->nestedParams[k],dataKeys[[3]])...)
+						cColNames =vcat(map(k->nestedParams[k],ctrlKeys[[1]])...)
 					end
+					data = tuple(i,collect(df[i,baseTerms])...,
+									collect(p_nested[ii,pTerms])...,
+									collect(c_nested[iii,cTerms])...)
+					push!(int_df,initRow(
+							colnames,
+							[:ind,vcat(baseTerms,pTerms,cColNames)...],
+							data))
 				end
+			else
+				baseTerms = vcat(map(k->nestedParams[k],dataKeys[[1]])...)
+				data = tuple(i,collect(df[i,baseTerms])...,
+								collect(p_nested[ii,pTerms])...)
+				push!(int_df,initRow(
+						colnames,
+						[:ind,vcat(baseTerms,pTerms)...],
+						data))
 			end
 		end
 	end
-	foundpaths
+	allverts = sortUnique(int_df[!,:participantRef],int_df[!,:interaction],
+							int_df[!,:ctrlEntityRef],int_df[!,:ctrlRxn])
+	g = MetaDiGraph(length(allverts))
+
+	for i in 1:size(int_df,1)
+		# participants
+		ptype = split(int_df[i,:participantType],"#")[2]
+		rxtype = split(int_df[i,:intType],"#")[2]
+		dxn = int_df[i,:partPred][end-4:end]
+
+		p_ind = findfirst(n->n==int_df[i,:participantRef],allverts)
+		set_props!(g, p_ind, Dict(:unification=>int_df[i,:participantRef],
+								  :entityType=>int_df[i,:participantType],
+								  :location=>int_df[i,:participantLocRef]))
+
+		rx_ind = findfirst(n->n==int_df[i,:interaction],allverts)
+		set_props!(g,rx_ind,Dict(:unification=>int_df[i,:interaction],
+								  :entityType=>int_df[i,:intType]))
+
+
+	    cond = int_df[i,:participantType] == "http://www.biopax.org/release/biopax-level3.owl#Dna"
+
+		if int_df[i,:partPred] == symIn
+			hasedge = has_edge(g, p_ind, rx_ind)
+			if hasedge
+				# println("\n\nedge $p_ind -> $rx_ind already exists")
+				# debugedge(int_df,i,g,p_ind,rx_ind,cond)
+			else
+				added = add_edge!(g,p_ind,rx_ind)
+			end
+			# added = add_edge!(g,p_ind,rx_ind)
+			# @assert added "edge $p_ind -> $rx_ind was not added"
+		elseif int_df[i,:partPred] == symOut
+			hasedge = has_edge(g, rx_ind, p_ind)
+			if hasedge
+				# println("\n\nedge $rx_ind -> $p_ind  already exists")
+				# debugedge(int_df,i,g,p_ind,rx_ind,cond)
+			else
+				added = add_edge!(g,rx_ind,p_ind)
+			end
+			# added = add_edge!(g,rx_ind,p_ind)
+			# @assert added "edge $rx_ind -> $p_ind was not added"
+		else
+			throw("only left/right reactions are supported")
+		end
+
+		# if int_df[i,:participantRef] == "http://pathwaycommons.org/pc11/#UnificationXref_reactome_R-HSA-2127254"
+		# 	println("found dna rxn")
+		# 	debugedge(int_df,i,g,p_ind,rx_ind)
+		# end
+
+
+		# optional ctrlRef vertex and edge properties
+		if !ismissing(int_df[i,:ctrlRxn])
+			ct_ind = findfirst(n->n==int_df[i,:ctrlEntityRef],allverts)
+			ct_rx_ind = findfirst(n->n==int_df[i,:ctrlRxn],allverts)
+			set_props!(g, ct_ind, Dict(:unification=>int_df[i,:ctrlEntityRef],
+									   :entityType=>int_df[i,:ctrlEntityType],
+									   :location=>int_df[i,:ctrlEntityLocRef]))
+
+			set_props!(g, ct_rx_ind, Dict(:unification=>int_df[i,:ctrlRxn],
+									   	  :entityType=>int_df[i,:ctrlRxnType],
+										  :controlType=>int_df[i,:ctrlRxnDir]))
+
+			add_edge!(g,ct_ind,ct_rx_ind)
+			add_edge!(g,ct_rx_ind,rx_ind)
+		end
+	end
+	Dict(:graph=>g,:vertices=>allverts,:simple=>int_df)
+end
+
+function debugedge(int_df,i,g,p_ind,rx_ind,cond)
+	if cond
+	rxtype = int_df[i,:intType]
+	ptype = int_df[i,:participantType]
+	oldRxType = props(g,rx_ind)[:entityType]
+	oldPType = props(g,p_ind)[:entityType]
+	rxref = int_df[i,:interaction]
+	pref = int_df[i,:participantRef]
+	rdir = int_df[i,:partPred]
+	pinn = inneighbors(g,p_ind)
+	pout = outneighbors(g,p_ind)
+	rinn = inneighbors(g,rx_ind)
+	rout = outneighbors(g,rx_ind)
+	println("\nparticipant direction is $rdir")
+	println("participant $p_ind ref is $pref")
+	println("rx $rx_ind ref is $rxref")
+	println("participant $p_ind in neighbors are $pinn")
+	println("participant $p_ind out neighbors are $pout")
+	println("rx $rx_ind in neighbors are $rinn")
+	println("rx $rx_ind out neighbors are $rout")
+	println("attempting to change p from $oldPType to $ptype")
+	println("attempting to change rx from $oldRxType to $rxtype\n\n")
+end
 end
