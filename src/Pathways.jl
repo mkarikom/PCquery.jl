@@ -3,8 +3,8 @@ function findTranscriptionBC(g::AbstractMetaGraph)
     ctrl = ["http://www.biopax.org/release/biopax-level3.owl#Catalysis",
  			"http://www.biopax.org/release/biopax-level3.owl#Control"]
 
-    colnames = [:geneInd,:ctrlInd,:protInd,
-                :geneRef,:ctrlRef,:protRef]
+    colnames = [:ctrlInd,:geneInd,:protInd,
+                :ctrlRef,:geneRef,:protRef]
     coltypes = [Union{Missing,Int64},Union{Missing,Int64},Union{Missing,Int64},
                 Union{Missing,String},Union{Missing,String},Union{Missing,String}]
     edgeTable = DataFrame(coltypes,colnames)
@@ -72,7 +72,7 @@ function getNested(dbParams::Dict,entity::String)
 end
 
 # query nextprot to get GO data on proteins
-function getNP(fcnParams::Dict,df::DataFrame)
+function getNP(fcnParams::Dict,g::AbstractMetaGraph,df::DataFrame)
 	uniprot_ids = fcnParams[:dbFilter](df)
 	entFilter = delimitValues(map(r->string(split(r,"/")[end]),uniprot_ids),"unipage:")
     srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
@@ -89,17 +89,21 @@ function getNP(fcnParams::Dict,df::DataFrame)
                         fcnParams[:host],fcnParams[:path],fcnParams[:method],
                         header,turtle)
 
-    annotation = parseSparqlResponse(resp)
-	# PCquery.deConcat!(annotations,:goTerms,:entries)
-	# map the annotations to terms and get the nodes
+    ann = parseSparqlResponse(resp)
+	# get the shorthand and add to the result
+	terms = fcnParams[:annotationMapAncTerm](ann)
+	insertcols!(ann, 3, :goAncShort=>terms)
 
-	ann = @from i in annotations begin
-		@group i by i.uniprot into g
-		@select {uniprot=key(g),goAncestor=unique(g.goAncestor),
-			entry=unique(g.entry),goTerm=unique(g.goTerm),isoform=unique(g.isoform)}
+	ctrlFcnVert = map(uniprot->collect(filter_vertices(g,:ctrlEntityEntId,uniprot)),map(iri->split(iri,"/")[end],ann.uniprot))
+	fcnVert = map(uniprot->collect(filter_vertices(g,:entId,uniprot)),map(iri->split(iri,"/")[end],ann.uniprot))
+	insertcols!(ann, 3, :ctrlFcnVert=>ctrlFcnVert)
+	insertcols!(ann, 3, :fcnVert=>fcnVert)
+
+	a = @from i in ann begin
+		@group i by {i.goAncShort} into g
+		@select {goAncShort=reduce(vcat,unique(g.goAncShort)),verts=vcat(g.fcnVert...)}
 		@collect DataFrame
 	end
-
 end
 
 function hasCol(df::DataFrame,testKey::Symbol)
@@ -123,4 +127,32 @@ function deConcat!(df::DataFrame,expandCols...)
     for c in expandCols
         df[!,c] = split.(df[!,c],",")
     end
+end
+
+function traverseGraph(g::AbstractMetaGraph,sources::Vector,destinations::Vector)
+	paths = []
+	for s in sources
+		t = dijkstra_shortest_paths(g, s);
+		p = enumerate_paths(t,destinations)
+		for pp in p
+			if length(pp) > 0
+				println("found path")
+				push!(paths,pp)
+			end
+		end
+	end
+	paths
+end
+
+function printProps(g::AbstractMetaGraph,paths::Vector,entSymbol::Symbol,strMap::Function)
+	for p in paths
+		println("\n\n")
+		pr = props(g,p[1])
+		pstring = strMap(pr[entSymbol])
+		for v in p[2:end]
+			pr = props(g,v)
+			pstring = string(pstring,"▶\n",strMap(pr[entSymbol]))
+		end
+		println(pstring)
+	end
 end

@@ -64,6 +64,11 @@ function initBpGraph(df::DataFrame,nestedParams,dataKeys,ctrlKeys)
 		dxn = int_df[i,:partPred][end-4:end]
 
 		p_ind = findfirst(n->n==int_df[i,:participantRef],allverts)
+		if !ismissing(int_df[i,nestedParams[:simpleEntity][1]])
+			set_props!(g,p_ind,
+				Dict(nestedParams[:simpleEntity] .=>
+					collect(int_df[i,nestedParams[:simpleEntity]])))
+		end
 		set_props!(g, p_ind, Dict(:unification=>int_df[i,:participantRef],
 								  :entityType=>int_df[i,:participantType],
 								  :location=>int_df[i,:participantLocRef]))
@@ -109,6 +114,11 @@ function initBpGraph(df::DataFrame,nestedParams,dataKeys,ctrlKeys)
 		if !ismissing(int_df[i,:ctrlRxn])
 			ct_ind = findfirst(n->n==int_df[i,:ctrlEntityRef],allverts)
 			ct_rx_ind = findfirst(n->n==int_df[i,:ctrlRxn],allverts)
+			if !ismissing(int_df[i,nestedParams[:ctrlSimpleEntity][1]])
+				set_props!(g,ct_ind,
+					Dict(nestedParams[:ctrlSimpleEntity] .=>
+						collect(int_df[i,nestedParams[:ctrlSimpleEntity]])))
+			end
 			set_props!(g, ct_ind, Dict(:unification=>int_df[i,:ctrlEntityRef],
 									   :entityType=>int_df[i,:ctrlEntityType],
 									   :location=>int_df[i,:ctrlEntityLocRef]))
