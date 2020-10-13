@@ -10,11 +10,11 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX unipage: <http://www.uniprot.org/uniprot/>
 
-#SELECT DISTINCT ?uniprot ?goAncestor
-#                (GROUP_CONCAT(DISTINCT ?goTerm;SEPARATOR=",") AS ?goTerms)
-#                (GROUP_CONCAT(DISTINCT ?isoform;SEPARATOR=",") AS ?isoforms)
-#                (GROUP_CONCAT(DISTINCT ?entry;SEPARATOR=",") AS ?entries)
-SELECT DISTINCT *
+SELECT DISTINCT ?uniprot ?goAncestor
+               (GROUP_CONCAT(DISTINCT ?goTerm;SEPARATOR=",") AS ?goTerms)
+               (GROUP_CONCAT(DISTINCT ?isoform;SEPARATOR=",") AS ?isoforms)
+               (GROUP_CONCAT(DISTINCT ?entry;SEPARATOR=",") AS ?entries)
+# SELECT DISTINCT *
 
 FROM <http://www.ontotext.com/explicit>
 WHERE {
@@ -28,4 +28,4 @@ WHERE {
          VALUES ?uniprot {{{entityFilter}}}
         # VALUES ?uniprot {<http://identifiers.org/uniprot/P46531>}
 }
-#GROUP BY ?uniprot ?goAncestor
+GROUP BY ?uniprot ?goAncestor
