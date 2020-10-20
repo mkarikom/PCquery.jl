@@ -1,0 +1,37 @@
+PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
+
+
+SELECT DISTINCT *
+FROM <http://www.ontotext.com/explicit>
+WHERE
+{
+# VALUES ?superEntity {<http://pathwaycommons.org/pc11/#Protein_012dcb9b7677f040bfebd8c0e03a6eae>} #ub
+# VALUES ?superEntity {<http://pathwaycommons.org/pc11/#Protein_8cb0276355b17e998db30d41e6597371>} # non nested protein (does not work with superEntity)
+# VALUES ?superEntity {<http://pathwaycommons.org/pc11/#Protein_b638acabd4d62e3350799f76062d2eaf>} # nested protein
+# VALUES ?superEntity {<http://pathwaycommons.org/pc11/#Complex_0f27b962c33ef29d971f77c678eb3067>} # complex (does not work with superEntity)
+# VALUES ?superEntity {<http://pathwaycommons.org/pc11/#Dna_065cb52a25cbfff35c80e456e2a9f2b0>} # non nested dna (does not work with superEntity)
+# VALUES ?superEntity {<http://pathwaycommons.org/pc11/#Dna_84fd7c722584087e9e5615c4e8c31783>} # nested dna
+# VALUES ?superEntity {<http://pathwaycommons.org/pc11/#SmallMolecule_5a039c428c8ffb03a8431e1334a39ef9>} # non nested small molecule (does not work with superEntity)
+	VALUES ?superEntity {{{ent}}}
+        ?participant ^bp:memberPhysicalEntity ?superEntity ;
+        		a ?participantType ;
+                bp:xref ?participantRef ;
+                bp:cellularLocation [ bp:xref ?participantLocRef ] .
+        ?participantRef a bp:UnificationXref ;
+                        bp:db ?dbname ;
+                        bp:id ?id.
+        OPTIONAL
+        {
+                ?participant bp:entityReference ?participantEntRef .
+            	?participantEntRef a ?participantEntRefType ;
+                                       bp:xref [ a bp:UnificationXref ;
+                                                 bp:id ?entId;
+																								 bp:db ?entIdDb ] .
+        }
+
+    FILTER(BOUND(?participantRef))
+}limit 100

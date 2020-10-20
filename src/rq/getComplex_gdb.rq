@@ -1,0 +1,20 @@
+PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
+
+SELECT DISTINCT *
+
+FROM <http://www.ontotext.com/explicit>
+
+WHERE {
+		?cx a bp:Complex .
+		 # VALUES ?cx {<http://pathwaycommons.org/pc11/#UnificationXref_reactome_R-HSA-4396384>} # complex components
+		VALUES ?cx {{{cx}}}
+
+		?comp ^(bp:memberPhysicalEntity|bp:component) ?cx ;
+					a ?compType ;
+     				bp:cellularLocation [ bp:xref ?participantLocRef ] .
+    	?cx bp:cellularLocation [ bp:xref ?cxLocRef ] .
+}
