@@ -1,4 +1,3 @@
-# addEdge!(g,p_ind,rx_ind,int_df[i,:],true)
 function addEdge!(g::AbstractMetaGraph,source::Int,dest::Int,
 					eProps::Dict,debug::Bool)
 	hasedge = has_edge(g, source, dest)
@@ -11,6 +10,17 @@ function addEdge!(g::AbstractMetaGraph,source::Int,dest::Int,
 		set_props!(g,source,dest,eProps)
 		@assert added "edge $source -> $dest error"
 	end
+end
+
+# add a new vertex, and associated properties to the graph
+# return the index of the new vertex
+function addVertex!(g::AbstractMetaGraph,vProps::Dict)
+	nvold = nv(g)
+	nvnew = nvold + 1
+	added = add_vertex!(g)
+	set_props!(g,nvnew,vProps)
+	@assert added "vertex $nvnew could not be added"
+	nvnew
 end
 
 function filterSubgraph(g::AbstractMetaGraph,props::Vector,values)
@@ -76,7 +86,7 @@ function filterEdges!(g::AbstractMetaGraph,filter::Dict,resultDict::Dict)
 end
 
 # as above but evaluate a function on a key
-function filterVertices!(g::AbstractMetaGraph,k::Symbol,f::Function)
+function filterVertices(g::AbstractMetaGraph,k::Symbol,f::Function)
 	resultVec = Vector{eltype(collect(vertices(g)))}()
 	for v in vertices(g)
 		vp = props(g,v)
@@ -90,7 +100,7 @@ function filterVertices!(g::AbstractMetaGraph,k::Symbol,f::Function)
 end
 
 # as above but evaluate a function on a key
-function filterEdges!(g::AbstractMetaGraph,k::Symbol,f::Function)
+function filterEdges(g::AbstractMetaGraph,k::Symbol,f::Function)
 	resultVec = Vector{eltype(collect(edges(g)))}()
 	for e in edges(g)
 		ep = props(g,e)
@@ -103,8 +113,8 @@ function filterEdges!(g::AbstractMetaGraph,k::Symbol,f::Function)
 	resultVec
 end
 
-# as above but also return a mapping of the value
-function filterVertices!(g::AbstractMetaGraph,k::Symbol,f::Function,m::Function)
+# as above but also return a function of the attribute dict for matching verts
+function filterVertices(g::AbstractMetaGraph,k::Symbol,f::Function,m::Function)
 	resultVec = Vector{eltype(collect(vertices(g)))}()
 	valVec = []
 	for v in vertices(g)
@@ -112,15 +122,15 @@ function filterVertices!(g::AbstractMetaGraph,k::Symbol,f::Function,m::Function)
 		if haskey(vp,k)
 			if f(props(g,v)[k])
 				push!(resultVec,v)
-				push!(valVec,m(props(g,v)[k]))
+				push!(valVec,m(props(g,v)))
 			end
 		end
 	end
 	(ind=resultVec,val=valVec)
 end
 
-# as above but also return a mapping of the value
-function filterEdges!(g::AbstractMetaGraph,k::Symbol,f::Function,m::Function)
+# as above but also return a function of the attribute dict for matching edges
+function filterEdges(g::AbstractMetaGraph,k::Symbol,f::Function,m::Function)
 	resultVec = Vector{eltype(collect(edges(g)))}()
 	valVec = []
 	for e in edges(g)
@@ -128,7 +138,7 @@ function filterEdges!(g::AbstractMetaGraph,k::Symbol,f::Function,m::Function)
 		if haskey(ep,k)
 			if f(props(g,e)[k])
 				push!(resultVec,e)
-				push!(valVec,m(props(g,e)[k]))
+				push!(valVec,m(props(g,e)))
 			end
 		end
 	end

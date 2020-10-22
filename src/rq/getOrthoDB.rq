@@ -1,0 +1,24 @@
+PREFIX odb:  <http://purl.orthodb.org/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
+PREFIX np: <http://nextprot.org/rdf#>
+PREFIX up: <http://purl.uniprot.org/core/>
+PREFIX uniprot: <http://purl.uniprot.org/uniprot/>
+
+
+select ?og ?gene ?description ?evolrate
+where {
+    ?gene a odb:Gene;
+          odb:xref/odb:xrefResource ?upid ;
+          odb:name ?name ;
+          odb:description ?description;
+          up:organism/a [up:scientificName "Danio rerio"].
+    ?gene odb:memberOf ?og.
+    ?og odb:ogBuiltAt [up:scientificName "Vertebrata"].
+    ?og a odb:OrthoGroup;
+        odb:ogPercentSingleCopy 100; odb:ogEvolRate ?evolrate.
+    VALUES ?upid {{{upid}}}
+}
+order by ?evolrate

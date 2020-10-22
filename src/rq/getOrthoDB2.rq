@@ -1,0 +1,18 @@
+prefix : <http://purl.orthodb.org/>
+PREFIX uniprot: <http://purl.uniprot.org/uniprot/>
+PREFIX up: <http://purl.uniprot.org/core/>
+select DISTINCT ?gene_a ?gene_a_name ?gene_h ?gene_h_name ?uniprot
+where {
+?gene_a a :Gene.
+?gene_h a :Gene.
+?gene_a up:organism/a [up:scientificName "Danio rerio"].
+?gene_h up:organism/a taxon:9606.
+?gene_a :name ?gene_a_name.
+?gene_h :name ?gene_h_name.
+?gene_a :memberOf ?og.
+?gene_h :memberOf ?og.
+?og a :OrthoGroup;
+    :name ?og_description;
+    ^:memberOf/:xref/:xrefResource ?uniprot
+VALUES ?uniprot {{{upid}}}
+} order by ?og

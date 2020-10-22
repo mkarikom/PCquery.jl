@@ -24,7 +24,7 @@ function expandInteractions(df::DataFrame,nestedParams)
 						nestedParams[:physicalEntity],
 						nestedParams[:simpleEntity])
 		for ii in 1:length(nonNested)
-			# push the participant simple entity dictionary to the ref list 
+			# push the participant simple entity dictionary to the ref list
 			push!(refs,nonNested[ii])
 			if length(collect(skipmissing(values(ctrlRxn)))) > 0
 				# push the ctrl rxn to the ref list
@@ -107,6 +107,68 @@ function initBpGraph(df::DataFrame,nestedParams)
 	Dict(:graph=>g,:vertices=>refs,:simple=>rxns)
 end
 
+# initialize a bipartite graph where {left,right,control} ʌ {interactions} = ∅
+# for edge [1,2], direction is 1->2.  define: [left,interaction], [interaction,right], [ctrl,interaction]
+# append a tree with
+function initBpGraphCx(df::DataFrame,nestedParams)
+	# get interactions
+	refs,rxns = expandInteractions(df::DataFrame,nestedParams)
+
+	# criteria for participant edge direction
+	symOut = "http://www.biopax.org/release/biopax-level3.owl#right"
+	symIn = "http://www.biopax.org/release/biopax-level3.owl#left"
+
+	# initialize the graph vertices
+	g = MetaDiGraph(length(refs))
+	for i in 1:length(refs)
+		added = set_props!(g,i,refs[i])
+	end
+
+	# initialize edges (rxns)
+	for i in 1:length(rxns)
+		# add the primary rxn
+		base_dict = rxns[i][:rxn]
+		rx_dict = rxns[i][:biochemRxn]
+		p_dict = rxns[i][:participant]
+		rx_ind = findVertex(g,rx_dict)
+		p_ind = findVertex(g,p_dict)
+		if rx_dict[:intType] == "http://www.biopax.org/release/biopax-level3.owl#BiochemicalReaction"
+			if base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#left"
+				addEdge!(g,p_ind,rx_ind,Dict(:eType=>"biochemInput"),false)
+			elseif base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#right"
+				addEdge!(g,rx_ind,p_ind,Dict(:eType=>"biochemOutput"),false)
+			end
+		else
+			rtype = rx_dict[:intType]
+			println("rxn $i unsupported rx type $rtype")
+		end
+
+		# add the control rxn if any
+		if haskey(rxns[i],:ctrlRxn)
+			ctrl_rx_dict = rxns[i][:ctrlRxn]
+			ctrl_p_dict = rxns[i][:ctrlEntity]
+			ctrl_rx_ind = findVertex(g,ctrl_rx_dict)
+			ctrl_p_ind = findVertex(g,ctrl_p_dict)
+			addEdge!(g,ctrl_p_ind,ctrl_rx_ind,Dict(:eType=>"controller"),false)
+			addEdge!(g,ctrl_rx_ind,rx_ind,Dict(:eType=>"catalysis"),false)
+		end
+	end
+
+	# initialize the graph vertices
+	for i in 1:length(refs)
+		if haskey(refs[i],:participantType)
+			if refs[i][:participantType] == "http://www.biopax.org/release/biopax-level3.owl#Complex"
+				masterlist = Vector{Vector{Int64}}()
+				appendTree!(g,i,masterlist,Dict(:eType=>"cxTree"))
+				set_props!(g,i,Dict(:vertShell=>masterlist))
+				println(string("updated props for cx $i: ",reduce(vcat,masterlist)))
+			end
+		end
+	end
+
+	Dict(:graph=>g,:vertices=>refs,:simple=>rxns)
+end
+
 # identify biochemical reactions where the input is Dna and output is protein
 function getTransTargs(g::AbstractMetaGraph)
     ctrl = ["http://www.biopax.org/release/biopax-level3.owl#Catalysis",
@@ -134,7 +196,7 @@ function getTransTargs(g::AbstractMetaGraph)
 										rxref = props(g,v)[:interaction]
 										inref = props(g,n_i)[:participant]
 										outref = props(g,n_o)[:participant]
-										data = tuple(v,n_i,n_o,inref,rxref,outref)
+										data = tuple(v,n_i,n_o,rxref,inref,outref)
 										push!(edgeTable,initRow(colnames,colnames,data))
 									end
 								else
@@ -187,40 +249,6 @@ function getParticipant(dbParams::Dict,entity::String)
     members = parseSparqlResponse(resp)
 end
 
-function getNextProt(fcnParams::Dict,g::AbstractMetaGraph,df::Vector)
-	simpleVerts = filterVertices!(g,:entIdDb,p->occursin("uniprot",p))
-	entFilter = delimitValues(map(r->string(split(r,"/")[end]),uniprot_ids),"unipage:")
-    srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
-    rqDir = string(srcDir,"/rq")
-    str = open(f->read(f, String), "$rqDir/getNextProt_gdb.rq");
-    turtle = Mustache.render(str,
-            Dict{Any,Any}("goFilter"=>fcnParams[:fcnRefs],
-						  "entityFilter"=>entFilter))
-    # compose the header and execute query
-    header = ["Content-Type" => "application/x-www-form-urlencoded",
-              "Accept" => "application/sparql-results+xml"]
-    fmt = "application/sparql-results+xml"
-    resp = PCquery.requestTTL(fcnParams[:port],fcnParams[:protocol],fmt,
-                        fcnParams[:host],fcnParams[:path],fcnParams[:method],
-                        header,turtle)
-
-    ann = parseSparqlResponse(resp)
-	# get the shorthand and add to the result
-	terms = fcnParams[:annotationMapAncTerm](ann)
-	insertcols!(ann, 3, :goAncShort=>terms)
-
-	ctrlFcnVert = map(uniprot->collect(filter_vertices(g,:ctrlEntityEntId,uniprot)),map(iri->split(iri,"/")[end],ann.uniprot))
-	fcnVert = map(uniprot->collect(filter_vertices(g,:entId,uniprot)),map(iri->split(iri,"/")[end],ann.uniprot))
-	insertcols!(ann, 3, :ctrlFcnVert=>ctrlFcnVert)
-	insertcols!(ann, 3, :fcnVert=>fcnVert)
-
-	a = @from i in ann begin
-		@group i by {i.goAncShort} into g
-		@select {goAncShort=reduce(vcat,unique(g.goAncShort)),verts=vcat(g.fcnVert...)}
-		@collect DataFrame
-	end
-end
-
 function hasCol(df::DataFrame,testKey::Symbol)
     cx = true
     if isnothing(findfirst(n->n==string(testKey),names(df)))
@@ -270,4 +298,56 @@ function printProps(g::AbstractMetaGraph,paths::Vector,entSymbol::Symbol,strMap:
 		end
 		println(pstring)
 	end
+end
+
+# mutate (extend) g with a directed tree rooted at the participant complex
+function appendTree!(g::AbstractMetaGraph,parentInd::Int,edgeProps)
+	children = props(g,parentInd)[:members]
+	for c in children
+		cInd = addVertex!(g,c)
+		addEdge!(g,cInd,parentInd,edgeProps,false)
+		if haskey(c,:members)
+			appendTree!(g,cInd)
+			rem_prop!(g,cInd,:members)
+		end
+	end
+end
+
+# mutate (extend) g with a directed tree rooted at the participant complex
+function appendTree!(g::AbstractMetaGraph,parentInd::Int,masterlist,edgeProps)
+	nlist = []
+	traverseNodeDict!(g,parentInd,nlist,edgeProps)
+	unpackNodes!(nlist,masterlist)
+	push!(masterlist,[parentInd])
+	reverse!(masterlist)
+end
+
+
+# mutate (extend) g with a directed tree rooted at the participant complex
+# return a nested vector which will later be unpacked
+function traverseNodeDict!(g::AbstractMetaGraph,parentInd::Int,nlist,edgeProps)
+	children = props(g,parentInd)[:members]
+	c_nlist=[]
+	for c in children
+		cInd = addVertex!(g,c)
+		addEdge!(g,cInd,parentInd,edgeProps,false)
+		if haskey(c,:members)
+			push!(nlist,traverseNodeDict!(g,cInd,c_nlist,edgeProps))
+			# rem_prop!(g,cInd,:members)
+		end
+		push!(nlist,cInd)
+	end
+	nlist
+end
+
+function unpackNodes!(nlist,masterlist)
+	clist = Vector{Int64}()
+	for i in nlist
+		if length(i) == 1
+			push!(clist,i)
+		else
+			unpackNodes!(i,masterlist)
+		end
+	end
+	push!(masterlist,clist)
 end

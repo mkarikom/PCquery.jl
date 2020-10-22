@@ -9,6 +9,7 @@ PREFIX cv: <http://nextprot.org/rdf/terminology/>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX unipage: <http://www.uniprot.org/uniprot/>
+PREFIX ns0: <http://nextprot.org/rdf#>
 
 SELECT DISTINCT ?uniprot ?goAncestor
                (GROUP_CONCAT(DISTINCT ?goTerm;SEPARATOR=",") AS ?goTerms)
@@ -20,6 +21,7 @@ FROM <http://www.ontotext.com/explicit>
 WHERE {
         ?entry a np:Entry ;
                np:swissprotPage ?uniprot ;
+               ns0:gene ?gene ;
                np:isoform ?isoform .
         ?isoform np:goMolecularFunction/np:term/np:childOf ?goAncestor ;
                  np:goMolecularFunction/np:term ?goTerm
