@@ -30,5 +30,5 @@ include("Nested.jl") # testing functions
 include("NextProt_module.jl") # will be separate modules
 include("LRpairs_module.jl") # will be separate modules
 include("OrthoDB_module.jl") # will be separate modules
-
+include("UniProt_module.jl") # queries to uniprot public endpoint
 end
