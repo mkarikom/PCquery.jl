@@ -1,9 +1,17 @@
-
-function delimitValues(iris::Vector,domain::String,wrap::String)
-	xs = string.(wrap[1],domain,iris,wrap[2])
-	xs = join(xs," ")
-	xs = "{$xs}"
-	xs = "$xs"
+function delimitValues(iris,domain::String,wrap)
+	if length(wrap) > 0
+		xs = string.(wrap[1],domain,iris,wrap[2])
+	else
+		xs = string.(domain,iris)
+	end
+	if typeof(iris) <: Vector
+		xs = join(xs," ")
+		xs = "{$xs}"
+		xs = "$xs"
+	else
+		xs = "{$xs}"
+		xs = "$xs"
+	end
 end
 
 function delimitValues(iris::Vector,domain::String)
