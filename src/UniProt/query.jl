@@ -1,7 +1,7 @@
 function getUniProt(dbParams::Dict)
     srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
-    rqDir = string(srcDir,"/rq")
-    str = open(f->read(f, String), "$rqDir/getUniProt.rq");
+    rqDir = string(srcDir,"/UniProt/rq")
+    str = open(f->read(f, String), string(rqDir,"/","getUniProt.rq"));
 	# turtle = str
     turtle = Mustache.render(str,
             Dict{Any,Any}("upid"=>dbParams[:upid]))
@@ -16,8 +16,8 @@ function getUniProt(dbParams::Dict)
     ann = parseSparqlResponse(resp)
 end
 
-function selectUniProt(uniprot_ids,upParams::Dict)
+function exploreUniProt(uniprot_ids,upParams::Dict)
 	entFilter = delimitValues(uniprot_ids,"",["('","')"])
 	upParams[:upid] = entFilter
-	unipr = PCquery.getUniProt(upParams)
+	unipr = getUniProt(upParams)
 end

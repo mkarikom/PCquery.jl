@@ -58,59 +58,8 @@ end
 
 # initialize a bipartite graph where {left,right,control} ʌ {interactions} = ∅
 # for edge [1,2], direction is 1->2.  define: [left,interaction], [interaction,right], [ctrl,interaction]
-# because the graph is bipartite, all edges will be labeled with bp:BiochemicalReaction
-function initBpGraph(df::DataFrame,nestedParams)
-	# get interactions
-	refs,rxns = expandInteractions(df::DataFrame,nestedParams)
-
-	# criteria for participant edge direction
-	symOut = "http://www.biopax.org/release/biopax-level3.owl#right"
-	symIn = "http://www.biopax.org/release/biopax-level3.owl#left"
-
-	# initialize the graph vertices
-	g = MetaDiGraph(length(refs))
-	for i in 1:length(refs)
-		added = set_props!(g,i,refs[i])
-		# println("updated props for vertex $i: $added")
-	end
-
-	# initialize edges (rxns)
-	for i in 1:length(rxns)
-		# add the primary rxn
-		base_dict = rxns[i][:rxn]
-		rx_dict = rxns[i][:biochemRxn]
-		p_dict = rxns[i][:participant]
-		rx_ind = findVertex(g,rx_dict)
-		p_ind = findVertex(g,p_dict)
-		if rx_dict[:intType] == "http://www.biopax.org/release/biopax-level3.owl#BiochemicalReaction"
-			if base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#left"
-				addEdge!(g,p_ind,rx_ind,Dict(:eType=>"biochemInput"),false)
-			elseif base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#right"
-				addEdge!(g,rx_ind,p_ind,Dict(:eType=>"biochemOutput"),false)
-			end
-		else
-			rtype = rx_dict[:intType]
-			println("rxn $i unsupported rx type $rtype")
-		end
-
-		# add the control rxn if any
-		if haskey(rxns[i],:ctrlRxn)
-			ctrl_rx_dict = rxns[i][:ctrlRxn]
-			ctrl_p_dict = rxns[i][:ctrlEntity]
-			ctrl_rx_ind = findVertex(g,ctrl_rx_dict)
-			ctrl_p_ind = findVertex(g,ctrl_p_dict)
-			addEdge!(g,ctrl_p_ind,ctrl_rx_ind,Dict(:eType=>"controller"),false)
-			addEdge!(g,ctrl_rx_ind,rx_ind,Dict(:eType=>"catalysis"),false)
-		end
-	end
-
-	Dict(:graph=>g,:vertices=>refs,:simple=>rxns)
-end
-
-# initialize a bipartite graph where {left,right,control} ʌ {interactions} = ∅
-# for edge [1,2], direction is 1->2.  define: [left,interaction], [interaction,right], [ctrl,interaction]
 # append a tree with
-function initBpGraphCx(df::DataFrame,nestedParams)
+function initGraph(df::DataFrame,nestedParams)
 	# get interactions
 	refs,rxns = expandInteractions(df::DataFrame,nestedParams)
 
@@ -169,6 +118,58 @@ function initBpGraphCx(df::DataFrame,nestedParams)
 	Dict(:graph=>g,:vertices=>refs,:simple=>rxns)
 end
 
+# get a vector of simple physical entity dictionaries
+function getNested(dbParams::Dict,entity::String,
+					entNames::Vector,entNamesSimple::Vector)
+	reflist = []
+	dbParams[:rqFile] = "getParticipantNested_gdb.rq"
+	resp = getParticipant(dbParams::Dict,entity::String)
+	if size(resp,1) == 0 # simple ref was provided
+		dbParams[:rqFile] = "getParticipantSimple_gdb.rq"
+		resp = getParticipant(dbParams::Dict,entity::String)
+	else # simple refs were retrieved from nested
+		indMissing = findall(n->ismissing(n),collect(resp[1,:]))
+		@assert length(indMissing) == 0 "all nested participants must be resolved"
+	end
+	# loop over refs and recurse any complexes
+	for i in 1:size(resp,1)
+		simpleNames = [dbParams[:physicalEntity]...,dbParams[:simpleEntity]...]
+		inds = indexin(simpleNames,Symbol.(names(resp)))
+		ind_found = findall(r->!isnothing(r),inds)
+		ind_notfound = findall(r->isnothing(r),inds)
+		# determine if resp[i,:] is a complex or a non-complex
+		if length(ind_found) < length(simpleNames)
+			println("adding complex row $i")
+			cxref =  resp[i,dbParams[:physicalEntity][4]]
+			members = decomposeComplex(dbParams,cxref)
+            cxdict = Dict([entNames...,:members] .=> [collect(resp[i,dbParams[:physicalEntity]])...,members])
+			push!(reflist,cxdict)
+		else
+			println("adding participant row $i")
+			push!(reflist,Dict([entNames...,entNamesSimple...] .=>
+				collect(resp[i,[dbParams[:physicalEntity]...,dbParams[:simpleEntity]...]])))
+		end
+	end
+	# @assert size(reflist,1) > 0 "require at least one simple ref"
+    reflist
+end
+
+# decompose all complexes in the interaction list
+function decomposeComplex(dbParams::Dict,cxref::String)
+	cxRefs = getComplex(dbParams,cxref)
+	members = []
+	for m in 1:size(cxRefs,1)
+        # need to include getNested here, temporarily omit
+        nonNested = getNested(dbParams,cxRefs[m,:comp],
+                                dbParams[:physicalEntity],
+                                dbParams[:simpleEntity])
+        for nn in 1:length(nonNested)
+            push!(members,nonNested[nn])
+        end
+	end
+	members
+end
+
 # identify biochemical reactions where the input is Dna and output is protein
 function getTransTargs(g::AbstractMetaGraph)
     ctrl = ["http://www.biopax.org/release/biopax-level3.owl#Catalysis",
@@ -212,41 +213,6 @@ function getTransTargs(g::AbstractMetaGraph)
 		end
 	end
 	edgeTable
-end
-
-function getPathways(dbParams::Dict)
-    val = delimitValues(dbParams[:refs],"")
-    srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
-    rqDir = string(srcDir,"/rq")
-    str = open(f->read(f, String), "$rqDir/getPC_gdb.rq");
-    turtle = Mustache.render(str,Dict{Any,Any}("pathVals"=>val))
-
-    # compose the header and execute query
-    header = ["Content-Type" => "application/x-www-form-urlencoded",
-    		  "Accept" => "application/sparql-results+xml"]
-    fmt = "application/sparql-results+xml"
-    resp = PCquery.requestTTL(dbParams[:port],"http",fmt,
-                        dbParams[:host],dbParams[:path],:POST,
-                        header,turtle)
-    df_pairs = PCquery.parseSparqlResponse(resp)
-end
-
-function getParticipant(dbParams::Dict,entity::String)
-    val = delimitValues([entity],"","<>")
-    srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
-    rqDir = string(srcDir,"/rq")
-    str = open(f->read(f, String), string(rqDir,"/",dbParams[:rqFile]));
-    turtle = Mustache.render(str,
-            Dict{Any,Any}("ent"=>val))
-
-    # compose the header and execute query
-    header = ["Content-Type" => "application/x-www-form-urlencoded",
-              "Accept" => "application/sparql-results+xml"]
-    fmt = "application/sparql-results+xml"
-    resp = PCquery.requestTTL(dbParams[:port],"http",fmt,
-                        dbParams[:host],dbParams[:path],:POST,
-                        header,turtle)
-    members = parseSparqlResponse(resp)
 end
 
 function hasCol(df::DataFrame,testKey::Symbol)

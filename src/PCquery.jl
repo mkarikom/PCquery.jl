@@ -7,7 +7,7 @@ using LightGraphs, MetaGraphs, GraphPlot
 using Mustache
 
 # graphs
-export initBpGraph,initBpGraphCx,filterVertices!,filterEdges!,filterVertices,filterEdges
+export initGraph,filterVertices!,filterEdges!,filterVertices,filterEdges
 
 # pathway related
 export getTransTargs,getPathways
@@ -21,14 +21,13 @@ export getNextProt, annotateGraph!
 # LRpairs_module
 export getCxLR
 
-include("Http.jl") # override delimiters
-include("Search.jl") # run http request against pc
-include("Sparql.jl") # sparql tools for various endpoints
-include("Graph.jl") # find paths
-include("Pathways.jl") # helper functions for pathway-related sparql
-include("Nested.jl") # testing functions
-include("NextProt_module.jl") # will be separate modules
-include("LRpairs_module.jl") # will be separate modules
-include("OrthoDB_module.jl") # will be separate modules
-include("UniProt_module.jl") # queries to uniprot public endpoint
+include("http.jl") # override delimiters
+include("sparql.jl") # sparql tools for various endpoints
+include("graph.jl") # find paths
+include("pathway.jl") # helper functions for pathway-related sparql
+include("PathwayCommons/query.jl") # will be separate modules
+include("NextProt/query.jl") # will be separate modules
+include("OrthoDB/query.jl") # will be separate modules
+include("UniProt/query.jl") # queries to uniprot public endpoint
+include("OMA/query.jl") # queries to OMA orthology public endpoint
 end
