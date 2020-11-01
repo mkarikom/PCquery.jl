@@ -1,7 +1,7 @@
-function getNextProt(fcnParams::Dict)
+function getNextProtFcn(fcnParams::Dict)
     srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
     rqDir = string(srcDir,"/NextProt/rq")
-    str = open(f->read(f, String), string(rqDir,"/","getNextProt_gdb.rq"));
+    str = open(f->read(f, String), string(rqDir,"/","getNextProtFcn_gdb.rq"));
     turtle = Mustache.render(str,
             Dict{Any,Any}("goFilter"=>fcnParams[:goFilter],
 						  "entityFilter"=>fcnParams[:entFilter]))

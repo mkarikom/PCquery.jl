@@ -1,3 +1,16 @@
+## Module: test UniProt SPARQL query
+# upParams = Dict(
+# 	:host=>"sparql.uniprot.org",
+# 	:port=>443,
+# 	:protocol=>"https",
+# 	:method=>:POST,
+# 	:path=>"/")
+#
+# simpleVerts = filterVertices(g,:entIdDb,p->occursin("uniprot",p))
+# uniprot_ids = map(v->props(g,v)[:entId],simpleVerts)
+# uniprot = PCquery.exploreUniProt(uniprot_ids[1],upParams)
+
+
 function getUniProt(dbParams::Dict)
     srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
     rqDir = string(srcDir,"/UniProt/rq")

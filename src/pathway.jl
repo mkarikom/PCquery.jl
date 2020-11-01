@@ -59,7 +59,18 @@ end
 # initialize a bipartite graph where {left,right,control} ʌ {interactions} = ∅
 # for edge [1,2], direction is 1->2.  define: [left,interaction], [interaction,right], [ctrl,interaction]
 # append a tree with
-function initGraph(df::DataFrame,nestedParams)
+function initGraph(df::DataFrame,dbParams::Dict)
+	# compose the db params
+	nestedParams = Dict{Symbol,Any}(
+		:interaction=>[:partPred],
+		:biochemInteraction=>[:interaction,:intType],
+		:ctrlInteraction=>[:ctrlRxn,:ctrlRxnType,:ctrlRxnDir],
+		:physicalEntity=>[:participantType,:participantRef,:participantLocRef,:participant],
+		:simpleEntity=>[:participantEntRef,:participantEntRefType,:entId,:entIdDb],
+		:ctrlPhysicalEntity=>[:ctrlEntityType,:ctrlEntityRef,:ctrlEntityLocRef,:ctrlEntity],
+		:ctrlSimpleEntity=>[:ctrlEntityEntRef,:ctrlEntityEntRefType,:ctrlEntityEntId,:ctrlEntityEntIdDb])
+	[nestedParams[k] = v for (k,v) in dbParams]
+
 	# get interactions
 	refs,rxns = expandInteractions(df::DataFrame,nestedParams)
 
@@ -168,51 +179,6 @@ function decomposeComplex(dbParams::Dict,cxref::String)
         end
 	end
 	members
-end
-
-# identify biochemical reactions where the input is Dna and output is protein
-function getTransTargs(g::AbstractMetaGraph)
-    ctrl = ["http://www.biopax.org/release/biopax-level3.owl#Catalysis",
- 			"http://www.biopax.org/release/biopax-level3.owl#Control"]
-
-    colnames = [:ctrlInd,:geneInd,:protInd,
-                :ctrlRef,:geneRef,:protRef]
-    coltypes = [Union{Missing,Int64},Union{Missing,Int64},Union{Missing,Int64},
-                Union{Missing,String},Union{Missing,String},Union{Missing,String}]
-    edgeTable = DataFrame(coltypes,colnames)
-
-	for v in vertices(g)
-		# identify biochemical rxn
-		if haskey(props(g,v),:intType)
-			if props(g,v)[:intType] == "http://www.biopax.org/release/biopax-level3.owl#BiochemicalReaction"
-				ns_o = outneighbors(g,v)
-		        ns_i = inneighbors(g,v)
-				println("out neigh = ",length(ns_o),", in neigh = ",length(ns_i))
-				for n_o in ns_o
-					for n_i in ns_i
-						if haskey(props(g,n_i),:participantType)
-							if props(g,n_i)[:participantType] == "http://www.biopax.org/release/biopax-level3.owl#Dna"
-								if haskey(props(g,n_o),:participantType)
-									if props(g,n_o)[:participantType] == "http://www.biopax.org/release/biopax-level3.owl#Protein"
-										rxref = props(g,v)[:interaction]
-										inref = props(g,n_i)[:participant]
-										outref = props(g,n_o)[:participant]
-										data = tuple(v,n_i,n_o,rxref,inref,outref)
-										push!(edgeTable,initRow(colnames,colnames,data))
-									end
-								else
-									println("no output participant $n_o")
-								end
-							end
-						else
-							println("no input participant $n_i")
-						end
-					end
-				end
-			end
-		end
-	end
-	edgeTable
 end
 
 function hasCol(df::DataFrame,testKey::Symbol)

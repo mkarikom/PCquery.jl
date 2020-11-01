@@ -1,9 +1,9 @@
-function annotateGraph!(fcnParams::Dict,g::AbstractMetaGraph)
+function annotateGraphFcn!(fcnParams::Dict,g::AbstractMetaGraph)
 	simpleVerts = filterVertices(g,:entIdDb,p->occursin("uniprot",p))
 	uniprot_ids = map(v->props(g,v)[:entId],simpleVerts)
 	entFilter = delimitValues(map(r->string(split(r,"/")[end]),unique(uniprot_ids)),"unipage:")
 	fcnParams[:entFilter] = entFilter
-	ann = getNextProt(fcnParams)
+	ann = getNextProtFcn(fcnParams)
 
 	# get the shorthand and add to the result
 	terms = fcnParams[:annotationMapAncTerm](ann)
@@ -22,7 +22,10 @@ function annotateGraph!(fcnParams::Dict,g::AbstractMetaGraph)
 
 	for r in 1:length(a[!,:goAncShort])
 		for v in a[r,:verts]
-			set_prop!(g, v, fcnParams[:annotationKey], a[r,:goAncShort])
+			annot = fcnParams[:annotationKey]
+			npval = a[r,:goAncShort]
+			println("setting $annot = $npval for vertex $v")
+			set_prop!(g, v, annot, npval)
 		end
 	end
 	a
@@ -73,6 +76,51 @@ function getLRtree(g::AbstractMetaGraph,dir::Symbol,
 	(v=vertFound,g=pc_sg)
 end
 
+# identify biochemical reactions where the input is Dna and output is protein
+function getTransTargs(g::AbstractMetaGraph)
+    ctrl = ["http://www.biopax.org/release/biopax-level3.owl#Catalysis",
+ 			"http://www.biopax.org/release/biopax-level3.owl#Control"]
+
+    colnames = [:ctrlInd,:geneInd,:protInd,
+                :ctrlRef,:geneRef,:protRef]
+    coltypes = [Union{Missing,Int64},Union{Missing,Int64},Union{Missing,Int64},
+                Union{Missing,String},Union{Missing,String},Union{Missing,String}]
+    edgeTable = DataFrame(coltypes,colnames)
+
+	for v in vertices(g)
+		# identify biochemical rxn
+		if haskey(props(g,v),:intType)
+			if props(g,v)[:intType] == "http://www.biopax.org/release/biopax-level3.owl#BiochemicalReaction"
+				ns_o = outneighbors(g,v)
+		        ns_i = inneighbors(g,v)
+				println("out neigh = ",length(ns_o),", in neigh = ",length(ns_i))
+				for n_o in ns_o
+					for n_i in ns_i
+						if haskey(props(g,n_i),:participantType)
+							if props(g,n_i)[:participantType] == "http://www.biopax.org/release/biopax-level3.owl#Dna"
+								if haskey(props(g,n_o),:participantType)
+									if props(g,n_o)[:participantType] == "http://www.biopax.org/release/biopax-level3.owl#Protein"
+										rxref = props(g,v)[:interaction]
+										inref = props(g,n_i)[:participant]
+										outref = props(g,n_o)[:participant]
+										data = tuple(v,n_i,n_o,rxref,inref,outref)
+										push!(edgeTable,initRow(colnames,colnames,data))
+									end
+								else
+									println("no output participant $n_o")
+								end
+							end
+						else
+							println("no input participant $n_i")
+						end
+					end
+				end
+			end
+		end
+	end
+	edgeTable
+end
+
 function getTxGraphs(g::AbstractMetaGraph,dir::Symbol,txList::DataFrame,targetFeatures::Dict)
 	# pull the protein ind (should already have ENSG id for zebrafish)
 	paths = []
@@ -94,6 +142,7 @@ function getTxGraphs(g::AbstractMetaGraph,dir::Symbol,txList::DataFrame,targetFe
 		allverts = Vector{eltype(collect(vertices(g)))}()
 		dstverts = []
 		for ft in targetFeatures[:roleLR]
+			println("processing target feature $ft")
 			dst = filterVertices(lrt.g,:roleLR,f->f==ft)
 			ep = enumerate_paths(p,dst)
 			push!(pathverts,(ft,unique(reduce(vcat,ep))))
@@ -121,33 +170,26 @@ function getTxGraphs(g::AbstractMetaGraph,dir::Symbol,txList::DataFrame,targetFe
 	paths
 end
 
-function plotTxGraphs(g,paths,drnm,cols,lw)
-	for i in 1:length(paths)
-		i = 1
-		recinds = paths[i].recind.ind
-		liginds = paths[i].ligind.ind
-		targind = paths[i].targind
-		gg = paths[i].graph
-		layout=(args...)->spring_layout(args...; C=20)
-		#nodesize = log.([LightGraphs.degree(gg, v) for v in LightGraphs.vertices(gg)])
-		nodesize=fill(1,nv(gg))
-		#alphas = nodesize/maximum(nodesize)
-		alphas=fill(1,nv(gg))
+function getLigRecTargs(g,dbParams)
+	## annotate graph vertices where a given GO molecular function was defined in the literature
+	# compose the fcnParams
+	goterms = Dict("GO_0038023"=>"receptor","GO_0048018"=>"ligand")
+	fcnParams = Dict(
+		:goFilter=>delimitValues(collect(keys(goterms)),"http://nextprot.org/rdf/terminology/","<>"),
+		:dbFilter=>x->x.entId[findall(db->db=="uniprot knowledgebase",skipmissing(x.entIdDb))],
+		:annotationMapAncTerm=>x->map(t->get(goterms,split(t,"/")[end],""),skipmissing(x.goAncestor)),
+		:vertKey=>:entId,
+		:annotationKey=>:roleLR)
+	[fcnParams[k] = v for (k,v) in dbParams]
+	annLR = PCquery.annotateGraphFcn!(fcnParams,g)
 
-		nodefillc = fill(cols[3],nv(gg))
-		nodefillc[targind] .= cols[4]
-		nodefillc[liginds] .= cols[1]
-		nodefillc[recinds] .= cols[2]
+	## annotate graph vertices with the native (eg human for pathway commons) gene ids
+	annGene = PCquery.annotateGraphGene!(dbParams,g)
 
-		nodelabel = fill("",nv(gg))
-		nodelabel[recinds] .= string.("REC:",paths[i].recind.val)
-		nodelabel[liginds] .= string.("LIG:",paths[i].ligind.val)
-		nodelabel[targind] .= string.("TARG:",paths[i].targgene)
+	# get the transcription targets (via graph traversal on g)
+	tt = getTransTargs(g)
 
-		gp = gplot(gg, layout=layout,
-			  arrowlengthfrac=0.02,
-			  arrowangleoffset = π/8,
-			  nodesize=nodesize, nodefillc=nodefillc, nodelabel=nodelabel)
-		draw(PDF(string(drnm,"path_$i","_",paths[i].targgene,"_path.pdf"), lw, lw), gp)
-	end
+	# get the graphs and special verts corresponding to lig rec
+	targetFeatures = Dict(:roleLR=>["ligand","receptor"])
+	paths = PCquery.getTxGraphs(g,:in,tt,targetFeatures)
 end

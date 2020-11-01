@@ -4,7 +4,7 @@ import HTTP.IOExtras
 using HTTP
 using Mustache
 using LightXML,DataFrames,Query
-using LightGraphs, MetaGraphs, GraphPlot
+using LightGraphs, MetaGraphs
 using Base.Threads
 
 # graphs

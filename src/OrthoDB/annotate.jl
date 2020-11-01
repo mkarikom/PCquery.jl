@@ -53,3 +53,39 @@ function annotatePathway!(dbParams::Dict,graph::AbstractMetaGraph)
 	end
 	ogs
 end
+
+# add gene expression for the given key:
+# all orthoDBId's at all levels
+function addExpression(graph::AbstractMetaGraph,
+						df::DataFrame,
+						key::Symbol,
+						modality::Symbol,
+						barcode::String)
+	# get vertices with orthologs
+	g = deepcopy(graph)
+	sv = filterVertices(g,:orthoDist,v->true)
+	# iterate over vertices
+	for v in sv
+		dists = get(props(g,v),:orthoDist,"")
+		dks = keys(dists)
+		for k in dks
+			mems = get(get(dists,k,""),:members,"")
+			for mem in mems
+				# replace the accession value eg for :orthoHGNC the value is "wwp2"
+				# with a dict including the accession value and the expression value
+				ind =  findfirst(x->x==get(mem,key,""),names(df))
+				indbc = findfirst(x->x==barcode,df[:barcode])
+				if !isnothing(ind) && !isnothing(indbc)
+					mem[modality] = Dict(:accession=>get(mem,key,""),
+										 :barcode=>barcode,
+										 :value=>df[indbc,ind])
+					println("added gene:$ind, barcode:$indbc")
+				else
+					println("cannot add gene:$ind, barcode $indbc")
+				end
+
+			end
+		end
+	end
+	g
+end
