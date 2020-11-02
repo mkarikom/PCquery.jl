@@ -8,16 +8,19 @@ using LightGraphs, MetaGraphs
 using Base.Threads
 
 # graphs
-export initGraph,filterVertices!,filterEdges!,filterVertices,filterEdges
+export initGraph,filterVertices!,filterEdges!,filterVertices,filterEdges,initRow
 
 # pathway related
-export getTransTargs,getPathways
+export getTransTargs,getPathways,annotatePathway!
 
 # search
 export delimitValues
 
 # NextProt_module
-export getNextProt, annotateGraph!
+export getNextProt, annotateGraphFcn!,annotateGraphGene!
+
+# orthodb module
+export addExpression
 
 # LRpairs_module
 export getCxLR

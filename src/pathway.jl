@@ -56,9 +56,19 @@ function expandInteractions(df::DataFrame,nestedParams)
 	(unique(refs),rxns)
 end
 
-# initialize a bipartite graph where {left,right,control} ʌ {interactions} = ∅
-# for edge [1,2], direction is 1->2.  define: [left,interaction], [interaction,right], [ctrl,interaction]
-# append a tree with
+# calls initGraph(df::DataFrame,dbParams::Dict)
+# after getPathways(pathwayParams)
+# given:
+#  1) a set of pathway refs
+#  2) dbParams
+function initGraph(refs::Vector,dbParams::Dict)
+	pathwayParams = copy(dbParams)
+	pathwayParams[:refs] = refs
+	df_pairs = getPathways(pathwayParams)
+	gd = initGraph(df_pairs,dbParams)
+end
+
+# initialize the graph
 function initGraph(df::DataFrame,dbParams::Dict)
 	# compose the db params
 	nestedParams = Dict{Symbol,Any}(
