@@ -4,7 +4,8 @@ function getOrthoDB(dbParams::Dict)
     str = open(f->read(f, String), string(rqDir,"/","getOrthoDB.rq"));
 	turtle = str
     turtle = Mustache.render(str,
-            Dict{Any,Any}("upid"=>dbParams[:upid],
+            Dict{Any,Any}("entid"=>dbParams[:entid],
+						  "entpfx"=>dbParams[:entpfx],
 			              "gname"=>dbParams[:gname],
 						  "spname"=>dbParams[:spname]))
     # compose the header and execute query
@@ -21,20 +22,19 @@ end
 function preGetOrthoDB!(q,origids,dbParams,df)
 	firstind = findfirst(x->x==q[1],origids)
 	lastind = findfirst(x->x==q[end],origids)
-	entFilter = delimitValues(q,"uniprot:","")
-	dbParams[:upid] = entFilter
+	entFilter = delimitValues(q,dbParams[:entpfxs],"")
+	dbParams[:entid] = entFilter
 	println("retrieving ids $firstind : $lastind")
 	append!(df,getOrthoDB(dbParams))
 end
 
 # serially process a list of uniprot ids
-function selectOrthologs(upids,dbParams::Dict)
-	origids = copy(upids)
-	df = DataFrame()
+function selectOrthologs!(endids,dbParams::Dict,df::DataFrame)
+	origids = copy(endids)
 	q = []
-	while length(upids) > 0
+	while length(endids) > 0
 		if length(q) < dbParams[:maxq]
-			id = popat!(upids,1,missing)
+			id = popat!(endids,1,missing)
 			if !ismissing(id)
 				push!(q,id)
 			else

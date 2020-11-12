@@ -1,22 +1,37 @@
 function annotatePathway!(graph::AbstractMetaGraph,dbParams::Dict)
-	# get the uniprot ids of all proteins in the graph
-	verts = filterVertices(graph,:entIdDb,p->occursin("uniprot",p))
-	uniprot_ids = map(v->props(graph,v)[:entId],verts)
 
-	# get the ortholog info for all upids
-	ogs = selectOrthologs(unique(uniprot_ids),dbParams)
+	df = DataFrame()
+	verts = []
+	ids = []
 
-	addOrthoDist!(graph::AbstractMetaGraph,verts,uniprot_ids,ogs)
+	dbParams[:entpfx]="http://purl.uniprot.org/uniprot/"
+	dbParams[:entpfxs]="uniprot:"
+	un_verts = filterVertices(graph,:entIdDb,p->occursin("uniprot",p))
+	un_ids = map(v->props(graph,v)[:entId],un_verts)
+	selectOrthologs!(unique(un_ids),dbParams,df)
 
-	ogs
+	ids = vcat(ids,un_ids)
+	verts = vcat(verts,un_verts)
+
+	dbParams[:entpfx]="http://rdf.ebi.ac.uk/resource/ensembl/"
+	dbParams[:entpfxs]="ensembl:"
+	en_verts = filterVertices(graph,:entIdDb,p->occursin("ensembl",p))
+	en_ids = map(v->props(graph,v)[:entId],en_verts)
+	selectOrthologs!(unique(en_ids),dbParams,df)
+	ids = vcat(ids,en_ids)
+	verts = vcat(verts,en_verts)
+
+	addOrthoDist!(graph,verts,ids,df)
+
+	(df=df,ids=ids,verts=verts)
 end
 
-function addOrthoDist!(graph::AbstractMetaGraph,verts,uniprot_ids,ogs)
+function addOrthoDist!(graph::AbstractMetaGraph,verts,eids,ogs)
 	# update the graph
+	dstr = unique(ogs[!,:orthoDist])
 	for ind in 1:length(verts)
 		vi = verts[ind]
-		uid = uniprot_ids[ind]
-		dstr = unique(ogs[!,:orthoDist])
+		uid = eids[ind]
 		dists = Dict()
 		for d in 1:length(dstr)
 			di = dstr[d]
@@ -25,37 +40,46 @@ function addOrthoDist!(graph::AbstractMetaGraph,verts,uniprot_ids,ogs)
 				  @select i
 				  @collect DataFrame
 				end
-			genes = []
-			for g in unique(ogd[!,:orthoDBId])
-				ogg = @from i in ogd begin
-					  @where (i.orthoDBId) == (g)
-					  @select i
-					  @collect DataFrame
+			if size(ogd)[1] > 0
+				println("adding dist ind $ind vert $vi uid $uid dist $di, ortholog count is ",size(ogd)[1])
+				genes = []
+				for g in unique(ogd[!,:orthoDBId])
+					ogg = @from i in ogd begin
+						  @where (i.orthoDBId) == (g)
+						  @select i
+						  @collect DataFrame
+						end
+					geneFeat = [:orthoGroup,:orthoDist,
+								:orthoSpecies,:orthoDBId,
+								:orthoHGNC,:orthoEnsembleGeneId]
+					gene = filter(v->!ismissing(v.second),
+									Dict{Symbol,Any}(Symbol.(names(ogg[1,geneFeat])).=>
+										values(ogg[1,geneFeat])))
+					upids = []
+					for op in unique(ogg.orthoEntId)
+						# println("update ortho distance $di for vertex $vi, gene $g, protein $op")
+						push!(upids,op)
 					end
-				geneFeat = [:orthoGroup,:orthoDist,
-							:orthoSpecies,:orthoDBId,
-							:orthoHGNC,:orthoEnsembleGeneId]
-				gene = filter(v->!ismissing(v.second),
-								Dict{Symbol,Any}(Symbol.(names(ogg[1,geneFeat])).=>
-									values(ogg[1,geneFeat])))
-				upids = []
-				for op in unique(ogg.orthoEntId)
-					println("update ortho distance $di for vertex $vi, gene $g, protein $op")
-					push!(upids,op)
+					gene[:orthoEntIds] = Tuple(upids)
+					push!(genes,gene)
 				end
-				gene[:orthoEntIds] = Tuple(upids)
-				push!(genes,gene)
+				og = Dict(
+						:orthoSpecies=>reduce(vcat,unique(ogd.orthoSpecies)),
+						:orthoGroup=>reduce(vcat,unique(ogd.orthoGroup)),
+						:members=>Tuple(genes))
+				# push!(dists,og)
+				dists[parse(Int64,di)]=og
+			else
+				println("no orthologs reported for ind $ind vert $vi uid $uid at dist $di")
 			end
-			og = Dict(
-					:orthoSpecies=>reduce(vcat,unique(ogd.orthoSpecies)),
-					:orthoGroup=>reduce(vcat,unique(ogd.orthoGroup)),
-					:members=>Tuple(genes))
-			# push!(dists,og)
-			dists[parse(Int64,di)]=og
 		end
 
-		msg = set_props!(graph,verts[ind],Dict(:orthoDist=>dists))
-		@assert msg == true "failed to add orthodb for vertex upid"
+		if length(dists) > 0
+			msg = set_props!(graph,verts[ind],Dict(:orthoDist=>dists))
+			@assert msg == true "failed to add orthodb for vertex upid"
+		else
+			println("no orthologs reported for ind $ind vert $vi uid $uid")
+		end
 	end
 end
 
