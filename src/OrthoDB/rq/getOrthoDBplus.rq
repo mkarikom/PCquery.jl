@@ -2,7 +2,8 @@ prefix : <http://purl.orthodb.org/>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 prefix : <http://purl.orthodb.org/>
 select DISTINCT
-(STRAFTER(xsd:string(?entId),"http://purl.uniprot.org/uniprot/") as ?entId)
+#(STRAFTER(xsd:string(?entId),"http://rdf.ebi.ac.uk/resource/ensembl/") as ?entId)
+(STRAFTER(xsd:string(?entId),"{{entPfx}}") as ?entId)
 (STRAFTER(xsd:string(?orthoGroup),"http://purl.orthodb.org/odbgroup/") as ?orthoGroup)
 (xsd:integer(?orthoDist) AS ?orthoDist) ?orthoSpecies
 	(STRAFTER(xsd:string(?orthoDBId),"http://purl.orthodb.org/odbgene/") as ?orthoDBId)
@@ -31,10 +32,11 @@ OPTIONAL {
     :ogBuiltAt [ :taxTreeDistance ?orthoDist ] ;
     !:memberOf/:xref/:xrefResource ?entId .
 
-#FILTER (regex(?orthoSpecies, "^.*danio", "i") && regex(?orthoSpecies, "^.*rerio", "i" ))
-FILTER (regex(?orthoSpecies, "^.*{{gname}}", "i") && regex(?orthoSpecies, "^.*{{spname}}", "i" ))
+FILTER (regex(?orthoSpecies, "^.*danio", "i") && regex(?orthoSpecies, "^.*rerio", "i" ))
+#FILTER (regex(?orthoSpecies, "^.*{{gname}}", "i") && regex(?orthoSpecies, "^.*{{spname}}", "i" ))
 
 #VALUES ?entId {uniprot:P60484}
-VALUES ?entId {{{upid}}}
+VALUES ?entId {ensembl:ENSG00000171862}
+#VALUES ?entId {{{upid}}}
 }
 ORDER BY ?orthoDist

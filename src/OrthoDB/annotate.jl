@@ -6,6 +6,12 @@ function annotatePathway!(graph::AbstractMetaGraph,dbParams::Dict)
 	# get the ortholog info for all upids
 	ogs = selectOrthologs(unique(uniprot_ids),dbParams)
 
+	addOrthoDist!(graph::AbstractMetaGraph,verts,uniprot_ids,ogs)
+
+	ogs
+end
+
+function addOrthoDist!(graph::AbstractMetaGraph,verts,uniprot_ids,ogs)
 	# update the graph
 	for ind in 1:length(verts)
 		vi = verts[ind]
@@ -18,14 +24,14 @@ function annotatePathway!(graph::AbstractMetaGraph,dbParams::Dict)
 				  @where (i.entId,i.orthoDist) == (uid,di)
 				  @select i
 				  @collect DataFrame
-			  	end
+				end
 			genes = []
 			for g in unique(ogd[!,:orthoDBId])
 				ogg = @from i in ogd begin
 					  @where (i.orthoDBId) == (g)
 					  @select i
 					  @collect DataFrame
-				  	end
+					end
 				geneFeat = [:orthoGroup,:orthoDist,
 							:orthoSpecies,:orthoDBId,
 							:orthoHGNC,:orthoEnsembleGeneId]
@@ -51,7 +57,6 @@ function annotatePathway!(graph::AbstractMetaGraph,dbParams::Dict)
 		msg = set_props!(graph,verts[ind],Dict(:orthoDist=>dists))
 		@assert msg == true "failed to add orthodb for vertex upid"
 	end
-	ogs
 end
 
 # add gene expression for the given key:
