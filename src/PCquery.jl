@@ -7,6 +7,10 @@ using LightXML,DataFrames,Query
 using LightGraphs, MetaGraphs
 using Base.Threads
 
+
+# import/export
+export exportLRT
+
 # graphs
 export initGraph,filterVertices!,filterEdges!,filterVertices,filterEdges,initRow
 
@@ -25,6 +29,7 @@ export addExpression
 # LRpairs_module
 export getCxLR
 
+include("util.jl") # saving and loading data
 include("http.jl") # override delimiters
 include("query.jl") # sparql tools for various endpoints
 include("graph.jl") # find paths
