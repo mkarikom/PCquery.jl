@@ -73,12 +73,13 @@ function initGraph(df::DataFrame,dbParams::Dict)
 	# compose the db params
 	nestedParams = Dict{Symbol,Any}(
 		:interaction=>[:partPred],
-		:biochemInteraction=>[:interaction,:intType],
+		:biochemInteraction=>[:interaction,:intType,:displayNameIntxn],
 		:ctrlInteraction=>[:ctrlRxn,:ctrlRxnType,:ctrlRxnDir],
-		:physicalEntity=>[:participantType,:participantRef,:participantLocRef,:participant],
+		:physicalEntity=>[:participantType,:participantRef,:participantLocRef,:participant,:displayName],
 		:simpleEntity=>[:participantEntRef,:participantEntRefType,:entId,:entIdDb],
 		:ctrlPhysicalEntity=>[:ctrlEntityType,:ctrlEntityRef,:ctrlEntityLocRef,:ctrlEntity],
 		:ctrlSimpleEntity=>[:ctrlEntityEntRef,:ctrlEntityEntRefType,:ctrlEntityEntId,:ctrlEntityEntIdDb])
+	# form a add pc entity-type-wise vertex property keys to the provided connection params (dbParams)
 	[nestedParams[k] = v for (k,v) in dbParams]
 
 	# get interactions
@@ -139,12 +140,16 @@ function initGraph(df::DataFrame,dbParams::Dict)
 	Dict(:graph=>g,:vertices=>refs,:simple=>rxns)
 end
 
+# forms a recursive loop with decomposeComplex
 # get a vector of simple physical entity dictionaries
 function getNested(dbParams::Dict,entity::String,
 					entNames::Vector,entNamesSimple::Vector)
 	reflist = []
 	dbParams[:rqFile] = "getParticipantNested_gdb.rq"
 	resp = getParticipant(dbParams::Dict,entity::String)
+	###
+	# Stopping criteria for recursion: have found physical entity
+	###
 	if size(resp,1) == 0 # simple ref was provided
 		dbParams[:rqFile] = "getParticipantSimple_gdb.rq"
 		resp = getParticipant(dbParams::Dict,entity::String)
@@ -175,6 +180,7 @@ function getNested(dbParams::Dict,entity::String,
     reflist
 end
 
+# forms a recursive loop with getNested
 # decompose all complexes in the interaction list
 function decomposeComplex(dbParams::Dict,cxref::String)
 	cxRefs = getComplex(dbParams,cxref)

@@ -3,6 +3,8 @@ module PCquery
 import HTTP.IOExtras
 using HTTP
 using Mustache
+using TikzGraphs,TikzPictures
+using JLD2
 using LightXML,DataFrames,Query
 using LightGraphs, MetaGraphs
 using Base.Threads
@@ -21,7 +23,7 @@ export getTransTargs,getPathways,annotatePathway!
 export delimitValues
 
 # NextProt_module
-export getNextProt, annotateGraphFcn!,annotateGraphGene!
+export getNextProt, annotateGraphFcn!,annotateGraphP!, annotateGraphG!
 
 # orthodb module
 export addExpression
@@ -29,7 +31,11 @@ export addExpression
 # LRpairs_module
 export getCxLR
 
+# plotting
+export plotDagLRT, plotDag
+
 include("util.jl") # saving and loading data
+include("plot.jl") # plotting
 include("http.jl") # override delimiters
 include("query.jl") # sparql tools for various endpoints
 include("graph.jl") # find paths

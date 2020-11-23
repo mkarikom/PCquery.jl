@@ -21,6 +21,7 @@ WHERE
 	VALUES ?participant {{{ent}}}
         ?participant a ?participantType ;
                 bp:xref ?participantRef ;
+								bp:displayName ?displayName ;
                 bp:cellularLocation [ bp:xref ?participantLocRef ] .
         ?participantRef a bp:UnificationXref ;
                         bp:db ?dbname ;

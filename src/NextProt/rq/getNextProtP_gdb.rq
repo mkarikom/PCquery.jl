@@ -17,9 +17,9 @@ FROM <http://www.ontotext.com/explicit>
 WHERE {
         ?entry a np:Entry ;
                np:swissprotPage ?uniprot ;
-               ns0:gene ?gene .
+               ns0:gene ?gene ;
+               ns0:isoform ?isoform .
+    	?gene ns0:name ?gname .
 
-        # VALUES ?goAncestor {{{goFilter}}}
         VALUES ?uniprot {{{unipage}}}
-         # VALUES ?uniprot {unipage:P46531}
 }

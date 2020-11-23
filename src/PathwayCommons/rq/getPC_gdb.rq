@@ -8,7 +8,7 @@ SELECT DISTINCT ?interaction ?participant ?intUniXrefId ?intType
 				?partPred  ?participantType
 				?participantLocRef
 				?ctrlRxn ?ctrlRxnType ?ctrlRxnDir
-				?ctrlEntity ?ctrlEntityType ?ctrlEntityLocRef
+				?ctrlEntity ?ctrlEntityType ?ctrlEntityLocRef ?displayName ?displayNameIntxn
 				(GROUP_CONCAT(DISTINCT ?pw;SEPARATOR=",") AS ?pws)
 
 FROM <http://www.ontotext.com/explicit>
@@ -27,9 +27,11 @@ WHERE {
                              		   bp:db ?intUniXrefDb ;
                              	       bp:id ?intUniXrefId ] ;
 
-                ?partPred ?participant .
+                ?partPred ?participant ;
+								bp:displayName ?displayNameIntxn .
 	    ?partPred rdfs:subPropertyOf bp:participant .
         ?participant a ?participantType ;
+										 bp:displayName ?displayName ;
 	 				 bp:cellularLocation [ bp:xref ?participantLocRef ] .
 
 	 		OPTIONAL { ?interaction ^bp:controlled ?ctrlRxn .
@@ -49,4 +51,4 @@ GROUP BY ?interaction
 				?partPred ?participant ?participantType
 				?participantLocRef
 				?ctrlRxn ?ctrlRxnType ?ctrlRxnDir
-				?ctrlEntity ?ctrlEntityType ?ctrlEntityLocRef
+				?ctrlEntity ?ctrlEntityType ?ctrlEntityLocRef ?displayName ?displayNameIntxn

@@ -1,17 +1,20 @@
 name = "PCquery"
 uuid = "235f3f79-a89d-4d04-8acc-8e76a70bca42"
 authors = ["Matt Karikomi <mattkarikomi@gmail.com> and contributors"]
-version = "0.1.0"
 repo = "https://github.com/mkarikom/PCquery.jl.git"
+version = "0.1.0"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
 LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
 MetaGraphs = "626554b9-1ddb-594c-aa3c-2596fe9399a5"
 Mustache = "ffc61752-8dc7-55ee-8c37-f3e9cdd09e70"
 Query = "1a8c2f83-1ff3-5112-b086-8aa67b057ba1"
+TikzGraphs = "b4f28e30-c73f-5eaf-a395-8a9db949a742"
+TikzPictures = "37f6aa50-8035-52d0-81c2-5a1d08754b2d"
 
 [compat]
 julia = "1"
