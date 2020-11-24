@@ -3,7 +3,7 @@ module PCquery
 import HTTP.IOExtras
 using HTTP
 using Mustache
-using TikzGraphs,TikzPictures
+using TikzGraphs,TikzPictures,ColorSchemes
 using JLD2
 using LightXML,DataFrames,Query
 using LightGraphs, MetaGraphs
@@ -32,7 +32,7 @@ export addExpression
 export getCxLR
 
 # plotting
-export plotDagLRT, plotDag
+export plotDagLRT, plotDag, plotDagExp
 
 include("util.jl") # saving and loading data
 include("plot.jl") # plotting
