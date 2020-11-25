@@ -1,71 +1,9 @@
-function plotDagLRT(targPath::NamedTuple,gParams::Dict)
-    g = targPath.graph
-    nodelabels = Vector{String}(undef,0)
-    nodestyles = Dict{Int64,String}()
-    nlab = ""
-    for v in 1:nv(g)
-        if any(in.(v,targPath.recinds.ind))
-            println("adding rec $v")
-            nlab = join(["R",v,props(g,v)[gParams[:lrt]]],":")
-            push!(nodestyles,v=>"fill=green!50")
-        elseif any(in.(v,targPath.liginds.ind))
-            println("adding lig $v")
-            nlab = join(["L",v,props(g,v)[gParams[:lrt]]],":")
-            push!(nodestyles,v=>"fill=yellow!50")
-        elseif any(in.(v,targPath.targinds))
-            println("adding targ $v")
-            nlab = join(["T",v,props(g,v)[gParams[:lrt]]],":")
-            push!(nodestyles,v=>"fill=red!50")
-        else
-            if haskey(props(g,v),:displayName)
-                println("adding p $v")
-                nlab = join(["P",v,props(g,v)[:displayName]],":")
-                push!(nodestyles,v=>"fill=white")
-            elseif haskey(props(g,v),:displayNameIntxn)
-                println("adding p $v")
-                nlab = join(["P",v,props(g,v)[:displayNameIntxn]],":")
-                push!(nodestyles,v=>"fill=white")
-            elseif haskey(props(g,v),:ctrlRxn)
-                ident = split(props(g,v)[:ctrlRxn],"/")[end]
-                nlab = join(["P",v,ident],":")
-            else
-                println("adding p $v")
-                nlab = join(["P",v],":")
-                push!(nodestyles,v=>"fill=white")
-            end
-        end
-        if length(nlab) > gParams[:nodelabelmax]
-            nlab = string(nlab[1:gParams[:nodelabelmax]],"...")
-            push!(nodelabels, nlab)
-        else
-            push!(nodelabels, nlab)
-        end
-        println(nlab)
-    end
-
-    gp = TikzGraphs.plot(DiGraph(g),gParams[:lt],nodelabels,
-                    node_style="draw,rounded corners",
-                    node_styles=nodestyles,
-                    edge_style="black,line width=0.25em",
-                    options=gParams[:opt])
-
-    if split(gParams[:fname],".")[end] == "tex"
-        TikzPictures.save(TEX(gParams[:fname]), gp)
-    elseif split(gParams[:fname],".")[end] == "svg"
-        TikzPictures.save(SVG(gParams[:fname]), gp)
-    elseif split(gParams[:fname],".")[end] == "pdf"
-        TikzPictures.save(PDF(gParams[:fname]), gp)
-    else
-        println("unknown output format: ",split(gParams[:fname],".")[end])
-        throw(error())
-    end
-    gp
-end
-
 function plotDag(g::AbstractGraph,gParams::Dict)
     nodelabels = Vector{String}(undef,0)
     nodestyles = Dict{Int64,String}()
-    # apply default styles
+    edgelabels = Dict{Tuple{Int64,Int64},String}()
+    edgestyles = Dict{Tuple{Int64,Int64},String}()
+    # apply default vertex styles
     for v in 1:nv(g)
         if haskey(props(g,v),:displayName)
             println("adding $v")
@@ -92,24 +30,40 @@ function plotDag(g::AbstractGraph,gParams::Dict)
         end
     end
 
-    # process custom key styles and filter
-    if haskey(gParams,:keystyles)
-        for s in 1:length(gParams[:keystyles])
-            sty = collect(gParams[:keystyles])[s]
-            for v in 1:nv(g)
-                if haskey(props(g,v),sty[1])
-                    nodestyles[v] = sty[2]
-                end
+    if haskey(gParams,:vfilter)
+        for s in 1:length(gParams[:vfilter])
+            sty = collect(gParams[:vfilter][s])
+            verts = filterVertices(g,sty[1][1],sty[1][2][1])
+            for v in verts
+                nodestyles[v] = sty[1][2][2]
             end
         end
     end
 
-    if haskey(gParams,:filterstyles)
-        for s in 1:length(gParams[:filterstyles])
-            sty = collect(gParams[:filterstyles][s])
-            verts = filterVertices(g,sty[1][1],sty[1][2][2])
-            for v in verts
-                nodestyles[v] = sty[1][2][1]
+    # apply default edge styles
+    for e in edges(g)
+        s = src(e)
+        d = dst(e)
+        et = (s,d)
+        println("found edge $s -> $d")
+        push!(edgestyles,et=>"black")
+        push!(edgelabels,et=>"")
+    end
+
+    # process custom key styles and filter
+    if haskey(gParams,:efilter)
+        for s in 1:length(gParams[:efilter])
+            sty = collect(gParams[:efilter][s])
+            edges = filterEdges(g,sty[1][1],sty[1][2][1])
+            for e in edges
+                edgestyles[(src(e),dst(e))] = sty[1][2][2]
+                elab = sty[1][2][3](e)
+                if length(elab) > gParams[:edgelabelmax]
+                    elab = string(elab[1:gParams[:edgelabelmax]],"...")
+                    edgelabels[(src(e),dst(e))] = elab
+                else
+                    edgelabels[(src(e),dst(e))] = elab
+                end
             end
         end
     end
@@ -117,7 +71,9 @@ function plotDag(g::AbstractGraph,gParams::Dict)
     gp = TikzGraphs.plot(DiGraph(g),gParams[:lt],nodelabels,
                     node_style="draw,rounded corners",
                     node_styles=nodestyles,
-                    edge_style="black,line width=0.25em",
+                    edge_style="black",
+                    edge_styles=edgestyles,
+                    edge_labels=edgelabels,
                     options=gParams[:opt])
 
     if split(gParams[:fname],".")[end] == "tex"
@@ -135,9 +91,12 @@ end
 
 # create a colorscale for the plot based on max value orthologs across all nodes
 function plotDagExp(g::AbstractGraph,gParams::Dict)
-    nodelabels = Vector{String}(undef,0)
     nodequants = Vector{Union{Missing,Float64}}(undef,0)
+    nodelabels = Vector{String}(undef,0)
     nodestyles = Dict{Int64,String}()
+    edgelabels = Dict{Tuple{Int64,Int64},String}()
+    edgestyles = Dict{Tuple{Int64,Int64},String}()
+
     if haskey(gParams,:colorscheme)
         cscheme = gParams[:colorscheme]
     else
@@ -224,27 +183,44 @@ function plotDagExp(g::AbstractGraph,gParams::Dict)
         end
     end
 
+    if haskey(gParams,:vfilter)
+        for s in 1:length(gParams[:vfilter])
+            sty = collect(gParams[:vfilter][s])
+            verts = filterVertices(g,sty[1][1],sty[1][2][1])
+            for v in verts
+                nodestyles[v] = sty[1][2][2]
+            end
+        end
+    end
+
+    # apply default edge styles
+    for e in edges(g)
+        s = src(e)
+        d = dst(e)
+        et = (s,d)
+        println("found edge $s -> $d")
+        push!(edgestyles,et=>"black")
+        push!(edgelabels,et=>"")
+    end
+
     # process custom key styles and filter
-    if haskey(gParams,:keystyles)
-        for s in 1:length(gParams[:keystyles])
-            sty = collect(gParams[:keystyles])[s]
-            for v in 1:nv(g)
-                if haskey(props(g,v),sty[1])
-                    nodestyles[v] = sty[2]
+    if haskey(gParams,:efilter)
+        for s in 1:length(gParams[:efilter])
+            sty = collect(gParams[:efilter][s])
+            edges = filterEdges(g,sty[1][1],sty[1][2][1])
+            for e in edges
+                edgestyles[(src(e),dst(e))] = sty[1][2][2]
+                elab = sty[1][2][3](e)
+                if length(elab) > gParams[:edgelabelmax]
+                    elab = string(elab[1:gParams[:edgelabelmax]],"...")
+                    edgelabels[(src(e),dst(e))] = elab
+                else
+                    edgelabels[(src(e),dst(e))] = elab
                 end
             end
         end
     end
 
-    if haskey(gParams,:filterstyles)
-        for s in 1:length(gParams[:filterstyles])
-            sty = collect(gParams[:filterstyles][s])
-            verts = filterVertices(g,sty[1][1],sty[1][2][2])
-            for v in verts
-                nodestyles[v] = sty[1][2][1]
-            end
-        end
-    end
 
     gp = TikzGraphs.plot(DiGraph(g),gParams[:lt],nodelabels,
                     node_style="draw,rounded corners",
