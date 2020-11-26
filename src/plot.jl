@@ -40,6 +40,12 @@ function plotDag(g::AbstractGraph,gParams::Dict)
         end
     end
 
+    if haskey(gParams,:highlightnodes)
+        for s in gParams[:highlightnodes]
+            nodestyles[s] = "fill=green!50"
+        end
+    end
+
     # apply default edge styles
     for e in edges(g)
         s = src(e)
@@ -49,6 +55,7 @@ function plotDag(g::AbstractGraph,gParams::Dict)
         push!(edgestyles,et=>"black")
         push!(edgelabels,et=>"")
     end
+
 
     # process custom key styles and filter
     if haskey(gParams,:efilter)
@@ -64,6 +71,19 @@ function plotDag(g::AbstractGraph,gParams::Dict)
                 else
                     edgelabels[(src(e),dst(e))] = elab
                 end
+            end
+        end
+    end
+
+    if haskey(gParams,:highlightedges)
+        for e in edges(g)
+            s = src(e)
+            d = dst(e)
+            if any(in.(s,eval(gParams[:highlightedges]))) && any(in.(d,eval(gParams[:highlightedges])))
+                et = (s,d)
+                println("highlighting edge $s -> $d")
+                push!(edgestyles,et=>"red,line width=1em")
+                push!(edgelabels,et=>"")
             end
         end
     end

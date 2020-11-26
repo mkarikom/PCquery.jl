@@ -292,7 +292,7 @@ function unpackNodes!(nlist,masterlist)
 	clist = Vector{Int64}()
 	for i in nlist
 		if length(i) == 1
-			push!(clist,i)
+			push!(clist,i...)
 		else
 			unpackNodes!(i,masterlist)
 		end
