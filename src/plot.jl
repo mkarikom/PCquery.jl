@@ -88,6 +88,12 @@ function plotDag(g::AbstractGraph,gParams::Dict)
         end
     end
 
+    ## escape "_" which generates a latex compile error because tries to do \text{..., _, ...} instead of \text{..., \_, ...}
+    nodelabels = replace.(nodelabels,  r"(\_)" => s"\\\1")
+    map!(l->replace(l,  r"(\_)" => s"\\\1"), values(edgelabels))
+
+
+    println("rendering plot")
     gp = TikzGraphs.plot(DiGraph(g),gParams[:lt],nodelabels,
                     node_style="draw,rounded corners",
                     node_styles=nodestyles,
@@ -241,6 +247,9 @@ function plotDagExp(g::AbstractGraph,gParams::Dict)
         end
     end
 
+    ## escape "_" which generates a latex compile error because tries to do \text{..., _, ...} instead of \text{..., \_, ...}
+    nodelabels = replace.(nodelabels,  r"(\_)" => s"\\\1")
+    map!(l->replace(l,  r"(\_)" => s"\\\1"), values(edgelabels))
 
     gp = TikzGraphs.plot(DiGraph(g),gParams[:lt],nodelabels,
                     node_style="draw,rounded corners",

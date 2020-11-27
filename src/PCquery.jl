@@ -3,7 +3,7 @@ module PCquery
 import HTTP.IOExtras
 using HTTP
 using Mustache
-using TikzGraphs,TikzPictures,ColorSchemes
+using TikzGraphs,TikzPictures,LaTeXStrings,ColorSchemes
 using JLD2
 using LightXML,DataFrames,Query
 using LightGraphs, MetaGraphs
