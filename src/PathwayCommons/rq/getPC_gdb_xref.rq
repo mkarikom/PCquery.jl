@@ -1,0 +1,55 @@
+PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
+
+SELECT DISTINCT ?interaction ?participant ?intUniXrefId ?intType
+				?partPred  ?participantType
+				?participantLocRef
+				?ctrlRxn ?ctrlRxnType ?ctrlRxnDir
+				?ctrlEntity ?ctrlEntityType ?ctrlEntityLocRef ?displayName ?displayNameIntxn
+				(GROUP_CONCAT(DISTINCT ?pw;SEPARATOR=",") AS ?pws)
+
+FROM <http://www.ontotext.com/explicit>
+
+WHERE {
+    ?pw bp:xref [ a bp:UnificationXref ;
+                  bp:db ?pwUniXrefDb ;
+                  bp:id ?pwUniXrefId] ;
+        bp:pathwayComponent* ?interaction .
+	#  VALUES ?pwUniXrefId {"R-HSA-2122948"^^xsd:string "R-HSA-2122947"^^xsd:string}
+#	VALUES ?pw {<http://identifiers.org/reactome/R-HSA-2122948> <http://identifiers.org/reactome/R-HSA-2122947>}
+	VALUES ?pw {{{pathVals}}}
+
+    	?intType ^a ?interaction ;
+                          rdfs:subClassOf+ bp:Interaction .
+    	?interaction bp:xref [ a bp:UnificationXref ;
+                             		   bp:db ?intUniXrefDb ;
+                             	       bp:id ?intUniXrefId ] ;
+
+                ?partPred ?participant ;
+								bp:displayName ?displayNameIntxn .
+	    ?partPred rdfs:subPropertyOf bp:participant .
+        ?participant a ?participantType ;
+										 bp:displayName ?displayName ;
+	 				 bp:cellularLocation [ bp:xref ?participantLocRef ] .
+
+	 		OPTIONAL { ?interaction ^bp:controlled ?ctrlRxn .
+	         		   ?ctrlRxn a ?ctrlRxnType .
+	             OPTIONAL {
+	 			 				 ?ctrlRxn bp:controlType ?ctrlRxnDir ;
+	 												bp:controller ?ctrlEntity .
+	 							 ?ctrlEntity a ?ctrlEntityType ;
+  	 										 bp:cellularLocation [ bp:xref ?ctrlEntityLocRef ] .
+	             }
+
+	         }
+}
+
+GROUP BY ?interaction
+				?intUniXrefId ?intType
+				?partPred ?participant ?participantType
+				?participantLocRef
+				?ctrlRxn ?ctrlRxnType ?ctrlRxnDir
+				?ctrlEntity ?ctrlEntityType ?ctrlEntityLocRef ?displayName ?displayNameIntxn

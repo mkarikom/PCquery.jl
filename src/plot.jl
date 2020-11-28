@@ -64,7 +64,7 @@ function plotDag(g::AbstractGraph,gParams::Dict)
             edges = filterEdges(g,sty[1][1],sty[1][2][1])
             for e in edges
                 edgestyles[(src(e),dst(e))] = sty[1][2][2]
-                elab = sty[1][2][3](e)
+                elab = sty[1][2][3](e,edgelabels)
                 if length(elab) > gParams[:edgelabelmax]
                     elab = string(elab[1:gParams[:edgelabelmax]],"...")
                     edgelabels[(src(e),dst(e))] = elab
