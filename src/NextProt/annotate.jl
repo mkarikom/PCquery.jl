@@ -37,45 +37,51 @@ end
 # add gene names and ensids for all the upids
 function annotateGraphP!(fcnParams::Dict,g::AbstractMetaGraph)
 	prot_v = filterVertices(g,:participantType,i->i=="http://www.biopax.org/release/biopax-level3.owl#Protein",a->get(a,:entId,missing))
-	fcnParams[:unipage]=delimitValues(unique(prot_v.val),"unipage:")
-	ann = getNextProtP(fcnParams::Dict)
+	if length(prot_v.ind) > 0
+		fcnParams[:unipage]=delimitValues(unique(prot_v.val),"unipage:")
+		ann = getNextProtP(fcnParams)
 
-	upids = map(x->split(x,"/")[end],ann[!,:uniprot])
-	insertcols!(ann, 1, :upid=>upids)
+		upids = map(x->split(x,"/")[end],ann[!,:uniprot])
+		insertcols!(ann, 1, :upid=>upids)
 
-	for v in 1:length(prot_v.ind)
-		ind = findfirst(x->x==prot_v.val[v],ann[!,:upid])
-		ens = split(ann[ind,:gene],"/")[end]
-		geneName = ann[ind,:gname]
-		status = set_props!(g, prot_v.ind[v], Dict(:ensId=>ens,
-										  :gname=>geneName))
-		if status
-			println("success: ensId=$ens, ensId=$geneName")
-		else
-			println("failed to set :ensId or :gname on ",prot_v.ind[v])
+		for v in 1:length(prot_v.ind)
+			ind = findfirst(x->x==prot_v.val[v],ann[!,:upid])
+			ens = split(ann[ind,:gene],"/")[end]
+			geneName = ann[ind,:gname]
+			status = set_props!(g, prot_v.ind[v], Dict(:ensId=>ens,
+											  :gname=>geneName))
+			if status
+				println("success: ensId=$ens, ensId=$geneName")
+			else
+				println("failed to set :ensId or :gname on ",prot_v.ind[v])
+			end
 		end
+		return ann
 	end
-	ann
+	nothing
 end
 
 # add gene names for all the ensids
 function annotateGraphG!(fcnParams::Dict,g::AbstractMetaGraph)
 	gene_v = filterVertices(g,:participantType,i->i=="http://www.biopax.org/release/biopax-level3.owl#Dna",a->get(a,:entId,missing))
-	fcnParams[:gene]=delimitValues(unique(gene_v.val),"gene:")
-	ann = getNextProtG(fcnParams::Dict)
+	if length(gene_v.ind) > 0
+		fcnParams[:gene]=delimitValues(unique(gene_v.val),"gene:")
+		ann = getNextProtG(fcnParams)
 
-	ensids = map(x->split(x,"/")[end],ann[!,:gene])
-	insertcols!(ann, 1, :ensid=>ensids)
+		ensids = map(x->split(x,"/")[end],ann[!,:gene])
+		insertcols!(ann, 1, :ensid=>ensids)
 
-	for v in 1:length(gene_v.ind)
-		ind = findfirst(x->x==gene_v.val[v],ann[!,:ensid])
-		geneName = ann[ind,:gname]
-		status = set_props!(g, gene_v.ind[v], Dict(:gname=>geneName))
-		if status
-			println("success: geneName=$geneName")
-		else
-			println("failed to set :gname on ",prot_v.ind[v])
+		for v in 1:length(gene_v.ind)
+			ind = findfirst(x->x==gene_v.val[v],ann[!,:ensid])
+			geneName = ann[ind,:gname]
+			status = set_props!(g, gene_v.ind[v], Dict(:gname=>geneName))
+			if status
+				println("success: geneName=$geneName")
+			else
+				println("failed to set :gname on ",prot_v.ind[v])
+			end
 		end
+		return ann
 	end
-	ann
+	nothing
 end

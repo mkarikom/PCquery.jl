@@ -1,11 +1,11 @@
 module PCquery
 
 import HTTP.IOExtras
-using HTTP
+using HTTP,URIs
 using Mustache
 using TikzGraphs,TikzPictures,LaTeXStrings,ColorSchemes
 using JLD2
-using LightXML,DataFrames,Query
+using LightXML,DataFrames,Query,JSON
 using LightGraphs, MetaGraphs
 using Base.Threads
 
@@ -27,6 +27,9 @@ export getNextProt, annotateGraphFcn!,annotateGraphP!, annotateGraphG!
 
 # orthodb module
 export addExpression
+
+# Pathway Commons
+export requestTTL, topPaths, getHttp, getPaths
 
 # LRpairs_module
 export getCxLR

@@ -1,5 +1,5 @@
 function getPathways(dbParams::Dict)
-    val = delimitValues(dbParams[:refs],"")
+    val = delimitValues(dbParams[:refs],"","<>")
     srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
     rqDir = string(srcDir,"/PathwayCommons/rq")
     str = open(f->read(f, String), string(rqDir,"/","getPC_gdb.rq"));

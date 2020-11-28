@@ -232,3 +232,65 @@ function getXMLres!(node,df)
         end
     end end end end
 end
+
+# pathway commons "top pathways" REST interface
+function getHttp(gParams::Dict)
+	uri = URIs.URI(
+			scheme=gParams[:scheme],
+			host=gParams[:host],
+			path=gParams[:path],
+			query=gParams[:query])
+	resp = HTTP.request("GET",uri)
+end
+
+# convenience get request to pc top pathways
+function topPaths(qParams::Dict)
+	rParams = Dict(
+			:scheme=>"https",
+			:host=>"www.pathwaycommons.org",
+			:path=>"/pc2/top_pathways.json",
+			:query=>qParams)
+	resp = getHttp(rParams)
+	parsed = JSON.parse(String(resp.body))
+	hits = parsed["searchHit"]
+	df = DataFrame(
+			typeof.(values(hits[1])),
+			Symbol.(names(hits[1])),0)
+	for i in 1:length(hits)
+		push!(df,hits[i])
+	end
+	unique(df)
+end
+
+function getPaths(params::Dict)
+	qParams = copy(params)
+	namefilter = nothing
+	if haskey(qParams,:filter)
+		namefilter = pop!(qParams,:filter)
+	end
+	rParams = Dict(
+			:scheme=>"https",
+			:host=>"www.pathwaycommons.org",
+			:path=>"/pc2/search.json",
+			:query=>qParams)
+	resp = getHttp(rParams)
+	parsed = JSON.parse(String(resp.body))
+	hits = parsed["searchHit"]
+	df = DataFrame(
+			typeof.(values(hits[1])),
+			Symbol.(names(hits[1])),0)
+	if !isnothing(namefilter)
+		for i in 1:length(hits)
+			for j in 1:length(namefilter)
+				if all(map(t->occursin(lowercase(t),lowercase.(hits[i]["name"])),namefilter[j]))
+					push!(df,hits[i])
+				end
+			end
+		end
+	else
+		for i in 1:length(hits)
+			push!(df,hits[i])
+		end
+	end
+	unique(df)
+end

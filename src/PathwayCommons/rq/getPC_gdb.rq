@@ -19,7 +19,8 @@ WHERE {
                   bp:id ?pwUniXrefId] ;
         bp:pathwayComponent* ?interaction .
 	#  VALUES ?pwUniXrefId {"R-HSA-2122948"^^xsd:string "R-HSA-2122947"^^xsd:string}
-	VALUES ?pwUniXrefId {{{pathVals}}}
+#	VALUES ?pw {<http://identifiers.org/reactome/R-HSA-2122948> <http://identifiers.org/reactome/R-HSA-2122947>}
+	VALUES ?pw {{{pathVals}}}
 
     	?intType ^a ?interaction ;
                           rdfs:subClassOf+ bp:Interaction .
