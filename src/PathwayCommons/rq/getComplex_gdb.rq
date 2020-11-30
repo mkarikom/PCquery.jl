@@ -6,7 +6,7 @@ PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
 
 SELECT DISTINCT *
 
-FROM <http://www.ontotext.com/explicit>
+{{{fromgraph}}}
 
 WHERE {
 		?cx a bp:Complex .

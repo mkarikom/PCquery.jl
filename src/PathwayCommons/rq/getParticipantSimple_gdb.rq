@@ -6,7 +6,9 @@ PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
 
 
 SELECT DISTINCT *
-FROM <http://www.ontotext.com/explicit>
+
+{{{fromgraph}}}
+
 WHERE
 {
 
@@ -17,15 +19,20 @@ WHERE
 # VALUES ?participant {<http://pathwaycommons.org/pc11/#Complex_0f27b962c33ef29d971f77c678eb3067>} # complex (works with participant)
 # VALUES ?participant {<http://pathwaycommons.org/pc11/#Dna_065cb52a25cbfff35c80e456e2a9f2b0>} # non nested dna
 # VALUES ?participant {<http://pathwaycommons.org/pc11/#Dna_84fd7c722584087e9e5615c4e8c31783>} # nested dna
-# VALUES ?participant {<http://pathwaycommons.org/pc11/#SmallMolecule_5a039c428c8ffb03a8431e1334a39ef9>} # non nested small molecule
+# VALUES ?participant {<http://pathwaycommons.org/pc12/Complex_0216f50ddaebbc44812e3494ceabc8a6>} # NEW non nested complex works
 	VALUES ?participant {{{ent}}}
         ?participant a ?participantType ;
-                bp:xref ?participantRef ;
-								bp:displayName ?displayName ;
                 bp:cellularLocation [ bp:xref ?participantLocRef ] .
-        ?participantRef a bp:UnificationXref ;
-                        bp:db ?dbname ;
-                        bp:id ?id.
+	OPTIONAL
+	{
+		?participant bp:xref ?participantRef ;
+			     bp:displayName ?displayName .
+
+	        ?participantRef a bp:UnificationXref ;
+	                        bp:db ?dbname ;
+	                        bp:id ?id.
+	}
+
         OPTIONAL
         {
                 ?participant bp:entityReference ?participantEntRef .
@@ -36,5 +43,5 @@ WHERE
         }
 
 
-    FILTER(BOUND(?participantRef))
+   # FILTER(BOUND(?participantRef))
 }limit 100

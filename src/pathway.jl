@@ -1,3 +1,49 @@
+# forms a recursive loop with decomposeComplex
+# get a vector of simple physical entity dictionaries
+function getNested(dbParams::Dict,entity::String,
+					entNames::Vector,entNamesSimple::Vector)
+	reflist = []
+	isnested = true
+	dbParams[:rqFile] = dbParams[:nestrqfile]
+	resp = getParticipant(dbParams,entity)
+	###
+	# Stopping criteria for recursion: have found physical entity
+	###
+	if size(resp,1) == 0 # simple ref was provided
+		isnested = false
+		dbParams[:rqFile] = dbParams[:simprqfile]
+		resp = getParticipant(dbParams,entity)
+	else # simple refs were retrieved from nested
+		indMissing = findall(n->ismissing(n),collect(resp[1,:]))
+		@assert length(indMissing) == 0 "all nested participants must be resolved"
+	end
+
+	if isnested
+		println("nested entity detected")
+	else
+		println("simple entity detected")
+	end
+
+	# loop over refs and recurse any complexes
+	for i in 1:size(resp,1)
+		cxtype = "http://www.biopax.org/release/biopax-level3.owl#Complex"
+		# determine if resp[i,:] is a complex or a non-complex
+		if resp.participantType[i] == cxtype
+			println("adding complex row $i")
+			cxref =  resp[i,dbParams[:physicalEntity][3]]
+			members = decomposeComplex(dbParams,cxref)
+            cxdict = Dict([entNames...,:members] .=> [collect(resp[i,dbParams[:physicalEntity]])...,members])
+			push!(reflist,cxdict)
+		else
+			println("adding participant row $i")
+			push!(reflist,Dict([entNames...,entNamesSimple...] .=>
+				collect(resp[i,[dbParams[:physicalEntity]...,dbParams[:simpleEntity]...]])))
+		end
+	end
+	# @assert size(reflist,1) > 0 "require at least one simple ref"
+    reflist
+end
+
 # step 1. an array of interaction dictionaries
 # each interaction dictionary has:
 # 	1) metadata for the edge
@@ -13,13 +59,17 @@ function expandInteractions(df::DataFrame,nestedParams)
 	symOut = "http://www.biopax.org/release/biopax-level3.owl#right"
 	symIn = "http://www.biopax.org/release/biopax-level3.owl#left"
 	for i in 1:size(df,1)
-		# println("getting rxn $i")
+
+		println("getting rxn $i of ", size(df,1))
+		if i == 65
+			println("stop now")
+		end
 		rxn = Dict(nestedParams[:interaction].=>collect(df[i,nestedParams[:interaction]]))
 		biochemRxn = Dict(nestedParams[:biochemInteraction].=>collect(df[i,nestedParams[:biochemInteraction]]))
 		# push the participant rxn dictionary to the ref list
 		push!(refs,biochemRxn)
 		ctrlRxn = Dict(nestedParams[:ctrlInteraction].=>collect(df[i,nestedParams[:ctrlInteraction]]))
-		entRef = df[i,nestedParams[:physicalEntity][4]] # the ref for the participant entity
+		entRef = df[i,nestedParams[:physicalEntity][3]] # the ref for the participant entity
 		nonNested = getNested(nestedParams,entRef,
 						nestedParams[:physicalEntity],
 						nestedParams[:simpleEntity])
@@ -33,6 +83,9 @@ function expandInteractions(df::DataFrame,nestedParams)
 				ctrlNonNested = getNested(nestedParams,ctrlEntRef,
 									nestedParams[:physicalEntity],
 									nestedParams[:simpleEntity])
+
+
+
 				for iii in 1:length(ctrlNonNested)
 					# push the ctrl simple entity dictionary to the ref list
 					push!(refs,ctrlNonNested[iii])
@@ -62,9 +115,9 @@ end
 #  1) a set of pathway refs
 #  2) dbParams
 function initGraph(refs::Vector,dbParams::Dict)
-	pathwayParams = copy(dbParams)
-	pathwayParams[:refs] = refs
-	df_pairs = getPathways(pathwayParams)
+	dbParams[:refs] = refs
+	dbParams[:rqFile] = dbParams[:pwrqfile]
+	df_pairs = getPathways(dbParams)
 	gd = initGraph(df_pairs,dbParams)
 end
 
@@ -73,9 +126,9 @@ function initGraph(df::DataFrame,dbParams::Dict)
 	# compose the db params
 	nestedParams = Dict{Symbol,Any}(
 		:interaction=>[:partPred],
-		:biochemInteraction=>[:interaction,:intType,:displayNameIntxn],
+		:biochemInteraction=>[:interaction,:intType,:intPubTitles],
 		:ctrlInteraction=>[:ctrlRxn,:ctrlRxnType,:ctrlRxnDir],
-		:physicalEntity=>[:participantType,:participantRef,:participantLocRef,:participant,:displayName],
+		:physicalEntity=>[:participantType,:participantLocRef,:participant],
 		:simpleEntity=>[:participantEntRef,:participantEntRefType,:entId,:entIdDb],
 		:ctrlPhysicalEntity=>[:ctrlEntityType,:ctrlEntityRef,:ctrlEntityLocRef,:ctrlEntity],
 		:ctrlSimpleEntity=>[:ctrlEntityEntRef,:ctrlEntityEntRefType,:ctrlEntityEntId,:ctrlEntityEntIdDb])
@@ -84,7 +137,7 @@ function initGraph(df::DataFrame,dbParams::Dict)
 
 	# get interactions
 	refs,rxns = expandInteractions(df::DataFrame,nestedParams)
-
+	println("done expanding interactions")
 	# criteria for participant edge direction
 	symOut = "http://www.biopax.org/release/biopax-level3.owl#right"
 	symIn = "http://www.biopax.org/release/biopax-level3.owl#left"
@@ -140,46 +193,6 @@ function initGraph(df::DataFrame,dbParams::Dict)
 	Dict(:graph=>g,:vertices=>refs,:simple=>rxns)
 end
 
-# forms a recursive loop with decomposeComplex
-# get a vector of simple physical entity dictionaries
-function getNested(dbParams::Dict,entity::String,
-					entNames::Vector,entNamesSimple::Vector)
-	reflist = []
-	dbParams[:rqFile] = "getParticipantNested_gdb.rq"
-	resp = getParticipant(dbParams::Dict,entity::String)
-	###
-	# Stopping criteria for recursion: have found physical entity
-	###
-	if size(resp,1) == 0 # simple ref was provided
-		dbParams[:rqFile] = "getParticipantSimple_gdb.rq"
-		resp = getParticipant(dbParams::Dict,entity::String)
-	else # simple refs were retrieved from nested
-		indMissing = findall(n->ismissing(n),collect(resp[1,:]))
-		@assert length(indMissing) == 0 "all nested participants must be resolved"
-	end
-	# loop over refs and recurse any complexes
-	for i in 1:size(resp,1)
-		simpleNames = [dbParams[:physicalEntity]...,dbParams[:simpleEntity]...]
-		inds = indexin(simpleNames,Symbol.(names(resp)))
-		ind_found = findall(r->!isnothing(r),inds)
-		ind_notfound = findall(r->isnothing(r),inds)
-		# determine if resp[i,:] is a complex or a non-complex
-		if length(ind_found) < length(simpleNames)
-			println("adding complex row $i")
-			cxref =  resp[i,dbParams[:physicalEntity][4]]
-			members = decomposeComplex(dbParams,cxref)
-            cxdict = Dict([entNames...,:members] .=> [collect(resp[i,dbParams[:physicalEntity]])...,members])
-			push!(reflist,cxdict)
-		else
-			println("adding participant row $i")
-			push!(reflist,Dict([entNames...,entNamesSimple...] .=>
-				collect(resp[i,[dbParams[:physicalEntity]...,dbParams[:simpleEntity]...]])))
-		end
-	end
-	# @assert size(reflist,1) > 0 "require at least one simple ref"
-    reflist
-end
-
 # forms a recursive loop with getNested
 # decompose all complexes in the interaction list
 function decomposeComplex(dbParams::Dict,cxref::String)
@@ -195,57 +208,6 @@ function decomposeComplex(dbParams::Dict,cxref::String)
         end
 	end
 	members
-end
-
-function hasCol(df::DataFrame,testKey::Symbol)
-    cx = true
-    if isnothing(findfirst(n->n==string(testKey),names(df)))
-        cx = false
-    end
-    cx
-end
-
-function sortUnique(cols...)
-    allvert = []
-    for c in cols
-        cverts = collect(skipmissing(c))
-        push!(allvert,cverts...)
-    end
-    sort(unique(allvert))
-end
-
-function deConcat!(df::DataFrame,expandCols...)
-    for c in expandCols
-        df[!,c] = split.(df[!,c],",")
-    end
-end
-
-function traverseGraph(g::AbstractMetaGraph,sources::Vector,destinations::Vector)
-	paths = []
-	for s in sources
-		t = dijkstra_shortest_paths(g, s);
-		p = enumerate_paths(t,destinations)
-		for pp in p
-			if length(pp) > 0
-				println("found path")
-				push!(paths,pp)
-			end
-		end
-	end
-	paths
-end
-
-function printProps(g::AbstractMetaGraph,paths::Vector,entSymbol::Symbol,strMap::Function)
-	for p in paths
-		println("\n\n")
-		pr = props(g,p[1])
-		pstring = strMap(pr[entSymbol])
-		for v in p[2:end]
-			pr = props(g,v)
-			pstring = string(pstring,"▶\n",strMap(pr[entSymbol]))
-		end
-		println(pstring)
-	end
 end
 
 # mutate (extend) g with a directed tree rooted at the participant complex
