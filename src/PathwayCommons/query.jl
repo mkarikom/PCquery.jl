@@ -3,8 +3,8 @@ function getPathways(dbParams::Dict)
     srcDir = join(split(pathof(PCquery),"/")[1:end-1],"/")
     rqDir = string(srcDir,"/PathwayCommons/rq")
     str = open(f->read(f, String), string(rqDir,"/",dbParams[:pwrqfile]));
-	cnames = [:pname,:pw,:displayNamePw,:interaction,:intType,:partPred,:participant,:ctrlRxn,:ctrlRxnType,:ctrlRxnDir,:ctrlEntity,:ctrlEntityType,:ctrlEntityLocRef,:intPubTitles,:intPubDbs,:intPubIds]
-	ctypes = [fill(Vector{Union{Missing,String}},13)...,fill(Vector{Union{Missing,Vector{String}}},3)...]
+	cnames = [:pname,:pw,:displayNamePw,:interaction,:intDisplayName,:intType,:partPred,:participant,:particiapantType,:ctrlRxn,:ctrlRxnDisplayName,:ctrlRxnType,:ctrlRxnDir,:ctrlEntity,:ctrlEntityType,:ctrlEntityLocRef,:intPubTitles,:intPubDbs,:intPubIds]
+	ctypes = [fill(Vector{Union{Missing,String}},16)...,fill(Vector{Union{Missing,Vector{String}}},3)...]
 	df_pairs = DataFrame(ctypes,cnames,0)
 	lengthdf = 10000
 	offset = 0
@@ -40,8 +40,8 @@ function getParticipant(dbParams::Dict,entity::String)
 
 	cnames = [:superEntity,:participant,:participantType,:participantLocRef,:displayName,
 			  :dbname,:id,:participantRef,
-			  :participantEntRef,:participantEntRefType,:entId,:entIdDb]
-	ctypes = fill(Union{Missing,String},12)
+			  :participantEntRef,:standardName,:participantEntRefType,:entId,:entIdDb]
+	ctypes = fill(Union{Missing,String},13)
 	members = DataFrame(ctypes,cnames,0)
 
     turtle = Mustache.render(str,Dict{Any,Any}("ent"=>val,
@@ -83,5 +83,11 @@ function getComplex(dbParams::Dict,cxref::String)
 						dbParams[:host],dbParams[:path],dbParams[:method],
 						header,turtle)
 
-	cxEnts = vcat(cxEnts,parseSparqlResponse(resp))
+	temp = parseSparqlResponse(resp)
+	if size(temp,1) > 0
+		cxEnts = vcat(cxEnts,temp;cols=:union)
+	else
+		cxEnts = temp
+	end
+	cxEnts
 end

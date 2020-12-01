@@ -10,18 +10,10 @@ function getNested(dbParams::Dict,entity::String,
 	# Stopping criteria for recursion: have found physical entity
 	###
 	if size(resp,1) == 0 # simple ref was provided
+		println("simple entity detected")
 		isnested = false
 		dbParams[:rqFile] = dbParams[:simprqfile]
 		resp = getParticipant(dbParams,entity)
-	else # simple refs were retrieved from nested
-		indMissing = findall(n->ismissing(n),collect(resp[1,:]))
-		@assert length(indMissing) == 0 "all nested participants must be resolved"
-	end
-
-	if isnested
-		println("nested entity detected")
-	else
-		println("simple entity detected")
 	end
 
 	# loop over refs and recurse any complexes
@@ -30,18 +22,28 @@ function getNested(dbParams::Dict,entity::String,
 		# determine if resp[i,:] is a complex or a non-complex
 		if resp.participantType[i] == cxtype
 			println("adding complex row $i")
-			cxref =  resp[i,dbParams[:physicalEntity][3]]
+			cxref =  resp[i,:participant]
 			members = decomposeComplex(dbParams,cxref)
-            cxdict = Dict([entNames...,:members] .=> [collect(resp[i,dbParams[:physicalEntity]])...,members])
+            cxdict = filterKeys(resp[i,:],entNames,dbParams[:physicalEntity])
+			cxdict[:members] = members
 			push!(reflist,cxdict)
 		else
 			println("adding participant row $i")
-			push!(reflist,Dict([entNames...,entNamesSimple...] .=>
-				collect(resp[i,[dbParams[:physicalEntity]...,dbParams[:simpleEntity]...]])))
+			cxdict = filterKeys(resp[i,:],
+								[entNames...,entNamesSimple...],
+								[dbParams[:physicalEntity]...,dbParams[:simpleEntity]...])
+			push!(reflist,cxdict)
 		end
 	end
 	# @assert size(reflist,1) > 0 "require at least one simple ref"
     reflist
+end
+
+# given a record (usually dataframe row) and a set of keys, return a dict with the found keys
+function filterKeys(rec,keys,filterkeys)
+	data = collect(rec[filterkeys])
+	inds = findall((!ismissing).(data))
+	d = Dict{Any,Any}(keys[inds].=>data[inds])
 end
 
 # step 1. an array of interaction dictionaries
@@ -52,24 +54,38 @@ end
 #		2.2) destination member dictionary
 # step 2. replace interaction dictionaries with nested members by a collection of interaction dictionaries over simple members
 #
-function expandInteractions(df::DataFrame,nestedParams)
+function expandInteractions(df::DataFrame,dbParams)
+	# compose the db params
+	nestedParams = Dict{Symbol,Any}(
+		:interaction=>[:partPred,:intDisplayName],
+		:biochemInteraction=>[:interaction,:intType,:intPubTitles],
+		:ctrlInteraction=>[:ctrlRxn,:ctrlRxnType,:ctrlRxnDir,:ctrlRxnDisplayName],
+		:physicalEntity=>[:participantType,:participantLocRef,:participant,:displayName],
+		:simpleEntity=>[:participantEntRef,:participantEntRefType,:entId,:entIdDb,:standardName])
+	# form a add pc entity-type-wise vertex property keys to the provided connection params (dbParams)
+	[nestedParams[k] = v for (k,v) in dbParams]
+
 	refs = []
 	rxns = []
-	# criteria for participant edge direction
-	symOut = "http://www.biopax.org/release/biopax-level3.owl#right"
-	symIn = "http://www.biopax.org/release/biopax-level3.owl#left"
 	for i in 1:size(df,1)
-
 		println("getting rxn $i of ", size(df,1))
-		if i == 65
-			println("stop now")
-		end
-		rxn = Dict(nestedParams[:interaction].=>collect(df[i,nestedParams[:interaction]]))
+		rxn = filterKeys(df[i,:],
+				   nestedParams[:interaction],
+				   nestedParams[:interaction])
 		biochemRxn = Dict(nestedParams[:biochemInteraction].=>collect(df[i,nestedParams[:biochemInteraction]]))
 		# push the participant rxn dictionary to the ref list
 		push!(refs,biochemRxn)
-		ctrlRxn = Dict(nestedParams[:ctrlInteraction].=>collect(df[i,nestedParams[:ctrlInteraction]]))
-		entRef = df[i,nestedParams[:physicalEntity][3]] # the ref for the participant entity
+		ctrlRxn = filterKeys(df[i,:],
+				   nestedParams[:ctrlInteraction],
+				   nestedParams[:ctrlInteraction])
+
+		entRef = df[i,:participant] # the ref for the participant entity
+
+		if df[i,:participantType] == "http://www.biopax.org/release/biopax-level3.owl#Dna"
+			println("stopping at $i")
+			#sleep(10000)
+		end
+
 		nonNested = getNested(nestedParams,entRef,
 						nestedParams[:physicalEntity],
 						nestedParams[:simpleEntity])
@@ -79,7 +95,7 @@ function expandInteractions(df::DataFrame,nestedParams)
 			if length(collect(skipmissing(values(ctrlRxn)))) > 0
 				# push the ctrl rxn to the ref list
 				push!(refs,ctrlRxn)
-				ctrlEntRef = df[i,nestedParams[:ctrlPhysicalEntity][4]] # the ref for the ctrl entity
+				ctrlEntRef = df[i,:ctrlEntity] # the ref for the ctrl entity
 				ctrlNonNested = getNested(nestedParams,ctrlEntRef,
 									nestedParams[:physicalEntity],
 									nestedParams[:simpleEntity])
@@ -118,29 +134,17 @@ function initGraph(refs::Vector,dbParams::Dict)
 	dbParams[:refs] = refs
 	dbParams[:rqFile] = dbParams[:pwrqfile]
 	df_pairs = getPathways(dbParams)
-	gd = initGraph(df_pairs,dbParams)
+	refs,rxns = expandInteractions(df_pairs,dbParams)
+	gd = initGraph(refs,rxns)
 end
 
 # initialize the graph
-function initGraph(df::DataFrame,dbParams::Dict)
-	# compose the db params
-	nestedParams = Dict{Symbol,Any}(
-		:interaction=>[:partPred],
-		:biochemInteraction=>[:interaction,:intType,:intPubTitles],
-		:ctrlInteraction=>[:ctrlRxn,:ctrlRxnType,:ctrlRxnDir],
-		:physicalEntity=>[:participantType,:participantLocRef,:participant],
-		:simpleEntity=>[:participantEntRef,:participantEntRefType,:entId,:entIdDb],
-		:ctrlPhysicalEntity=>[:ctrlEntityType,:ctrlEntityRef,:ctrlEntityLocRef,:ctrlEntity],
-		:ctrlSimpleEntity=>[:ctrlEntityEntRef,:ctrlEntityEntRefType,:ctrlEntityEntId,:ctrlEntityEntIdDb])
-	# form a add pc entity-type-wise vertex property keys to the provided connection params (dbParams)
-	[nestedParams[k] = v for (k,v) in dbParams]
-
-	# get interactions
-	refs,rxns = expandInteractions(df::DataFrame,nestedParams)
-	println("done expanding interactions")
-	# criteria for participant edge direction
-	symOut = "http://www.biopax.org/release/biopax-level3.owl#right"
-	symIn = "http://www.biopax.org/release/biopax-level3.owl#left"
+function initGraph(refs,rxns)
+	# what reactions to consider
+	rxtypes = ["http://www.biopax.org/release/biopax-level3.owl#ComplexAssembly",
+			   "http://www.biopax.org/release/biopax-level3.owl#Transport",
+			   "http://www.biopax.org/release/biopax-level3.owl#BiochemicalReaction",
+			   "http://www.biopax.org/release/biopax-level3.owl#TransportWithBiochemicalReaction"]
 
 	# initialize the graph vertices
 	g = MetaDiGraph(length(refs))
@@ -156,7 +160,7 @@ function initGraph(df::DataFrame,dbParams::Dict)
 		p_dict = rxns[i][:participant]
 		rx_ind = findVertex(g,rx_dict)
 		p_ind = findVertex(g,p_dict)
-		if rx_dict[:intType] == "http://www.biopax.org/release/biopax-level3.owl#BiochemicalReaction"
+		if any(occursin.(rx_dict[:intType],rxtypes))
 			if base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#left"
 				addEdge!(g,p_ind,rx_ind,Dict(:eType=>"biochemInput"),false)
 			elseif base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#right"

@@ -21,8 +21,12 @@ WHERE
 # VALUES ?participant {<http://pathwaycommons.org/pc11/#Dna_84fd7c722584087e9e5615c4e8c31783>} # nested dna
 # VALUES ?participant {<http://pathwaycommons.org/pc12/Complex_0216f50ddaebbc44812e3494ceabc8a6>} # NEW non nested complex works
 	VALUES ?participant {{{ent}}}
-        ?participant a ?participantType ;
-                bp:cellularLocation [ bp:xref ?participantLocRef ] .
+        ?participant a ?participantType .
+
+	OPTIONAL
+	{
+		?participant bp:cellularLocation [ bp:xref ?participantLocRef ] .
+	}
 	OPTIONAL
 	{
 		?participant bp:xref ?participantRef ;
@@ -33,14 +37,18 @@ WHERE
 	                        bp:id ?id.
 	}
 
-        OPTIONAL
-        {
-                ?participant bp:entityReference ?participantEntRef .
-            	?participantEntRef a ?participantEntRefType ;
-                                       bp:xref [ a bp:UnificationXref ;
-                                                 bp:id ?entId ;
-																								 bp:db ?entIdDb ] .
-        }
+	OPTIONAL
+  {
+          ?participant bp:entityReference ?participantEntRef .
+      	?participantEntRef a ?participantEntRefType ;
+                                 bp:xref [ a bp:UnificationXref ;
+                                           bp:id ?entId ;
+																					 bp:db ?entIdDb ] .
+				OPTIONAL
+				{
+					?participantEntRef bp:standardName ?standardName .
+				}
+  }
 
 
    # FILTER(BOUND(?participantRef))

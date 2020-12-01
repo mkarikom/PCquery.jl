@@ -17,7 +17,7 @@ export exportLRT
 export initGraph,filterVertices!,filterEdges!,filterVertices,filterEdges,initRow
 
 # pathway related
-export getTransTargs,getPathways,annotatePathway!
+export getTransTargs,getPathways,annotatePathway!,expandInteractions
 
 # search
 export delimitValues
