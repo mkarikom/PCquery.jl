@@ -5,7 +5,6 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
 
 SELECT DISTINCT
-	?pname
 	?pw
 	?displayNamePw
 	?interaction
@@ -33,26 +32,38 @@ WHERE {
 #VALUES ?pw {<http://pathwaycommons.org/pc12/Pathway_b63e3e30297acb0ab2fec4250c1eb294> <http://pathwaycommons.org/pc12/Pathway_a655fac45ae26a6f8ab1542352531b8c>}
 
 	VALUES ?pw {{{pathVals}}}
-
+	VALUES ?intType {bp:Catalysis
+											 bp:Modulation
+											 bp:TemplateReaction
+											 bp:TemplateReactionRegulation
+											 bp:BiochemicalReaction
+										   bp:ComplexAssembly
+										   bp:Degradation
+										   bp:Transport
+										   bp:TransportWithBiochemicalReaction}
 	?pw a bp:Pathway ;
 					bp:pathwayComponent* ?interaction .
 	?partPred rdfs:subPropertyOf bp:participant .
 	?intType rdfs:subClassOf+ bp:Interaction .
+	FILTER NOT EXISTS { ?intType rdfs:subClassOf+ bp:Control }
 	?interaction ?partPred ?participant ;
-							 a ?intType ;
-							 bp:xref [ a bp:PublicationXref ;
-												 bp:title ?intPubTitle ;
-												 bp:id ?intPubId ;
-												 bp:db ?intPubDb] .
+							 a ?intType .
 	?participant a ?participantType .
+	OPTIONAL
+	{
+		?interaction bp:xref [ a bp:PublicationXref ;
+		bp:title ?intPubTitle ;
+		bp:id ?intPubId ;
+		bp:db ?intPubDb] .
+	}
+
 		OPTIONAL
 		{
 		 ?interaction bp:displayName ?intDisplayName .
 		}
  		OPTIONAL
 		{
-			?pw bp:name ?pname ;
-						bp:displayName ?displayNamePw .
+			?pw bp:displayName ?displayNamePw .
 		}
 
     OPTIONAL {
@@ -76,8 +87,7 @@ WHERE {
 #    FILTER(BOUND(?ctrlRxn))
 }
 
-GROUP BY ?pname
-         ?pw
+GROUP BY ?pw
 				 ?displayNamePw
 				 ?interaction
 				 ?intDisplayName

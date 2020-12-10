@@ -17,7 +17,7 @@ export exportLRT
 export initGraph,filterVertices!,filterEdges!,filterVertices,filterEdges,initRow
 
 # pathway related
-export getTransTargs,getPathways,annotatePathway!,expandInteractions
+export getTransTargs,getPathways,annotatePathway!,expandInteractions,getStatic,searchPathways
 
 # search
 export delimitValues
@@ -26,10 +26,10 @@ export delimitValues
 export getNextProt, annotateGraphFcn!,annotateGraphP!, annotateGraphG!
 
 # orthodb module
-export addExpression
+export addExpression,selectOrthologs!,getOrthoDist
 
 # Pathway Commons
-export requestTTL, topPaths, getHttp, getPaths
+export requestTTL, topPathsGet, getHttp, searchPathsGet
 
 # LRpairs_module
 export getCxLR

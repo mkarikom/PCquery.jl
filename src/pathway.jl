@@ -1,7 +1,7 @@
 # forms a recursive loop with decomposeComplex
 # get a vector of simple physical entity dictionaries
 function getNested(dbParams::Dict,entity::String,
-					entNames::Vector,entNamesSimple::Vector)
+					entNames::Vector,entNamesSimple::Vector;verbose=false)
 	reflist = []
 	isnested = true
 	dbParams[:rqFile] = dbParams[:nestrqfile]
@@ -10,7 +10,7 @@ function getNested(dbParams::Dict,entity::String,
 	# Stopping criteria for recursion: have found physical entity
 	###
 	if size(resp,1) == 0 # simple ref was provided
-		println("simple entity detected")
+		verbose ? println("simple entity detected") : nothing
 		isnested = false
 		dbParams[:rqFile] = dbParams[:simprqfile]
 		resp = getParticipant(dbParams,entity)
@@ -19,16 +19,31 @@ function getNested(dbParams::Dict,entity::String,
 	# loop over refs and recurse any complexes
 	for i in 1:size(resp,1)
 		cxtype = "http://www.biopax.org/release/biopax-level3.owl#Complex"
+		unknowntype = "http://www.biopax.org/release/biopax-level3.owl#PhysicalEntity"
 		# determine if resp[i,:] is a complex or a non-complex
 		if resp.participantType[i] == cxtype
-			println("adding complex row $i")
+			verbose ? println("adding complex row $i") : nothing
 			cxref =  resp[i,:participant]
 			members = decomposeComplex(dbParams,cxref)
             cxdict = filterKeys(resp[i,:],entNames,dbParams[:physicalEntity])
 			cxdict[:members] = members
 			push!(reflist,cxdict)
+		elseif resp.participantType[i] == unknowntype
+			verbose ? println("adding generic to $i") : nothing
+			cxdict = filterKeys(resp[i,:],
+								[entNames...,entNamesSimple...],
+								[dbParams[:physicalEntity]...,dbParams[:simpleEntity]...])
+			push!(reflist,cxdict)
+		elseif ismissing(resp.entId[i])
+			verbose ? println("expanding family row $i") : nothing
+			famref = resp[i,:participant]
+			members = getNested(dbParams,famref,
+								entNames,entNamesSimple)
+			cxdict = filterKeys(resp[i,:],entNames,dbParams[:physicalEntity])
+			cxdict[:members] = members
+			push!(reflist,cxdict)
 		else
-			println("adding participant row $i")
+			verbose ? println("adding participant row $i") : nothing
 			cxdict = filterKeys(resp[i,:],
 								[entNames...,entNamesSimple...],
 								[dbParams[:physicalEntity]...,dbParams[:simpleEntity]...])
@@ -54,11 +69,12 @@ end
 #		2.2) destination member dictionary
 # step 2. replace interaction dictionaries with nested members by a collection of interaction dictionaries over simple members
 #
-function expandInteractions(df::DataFrame,dbParams)
+function expandInteractions(df::DataFrame,dbParams;verbose=false)
 	# compose the db params
+	ctrlExclude = ["http://www.biopax.org/release/biopax-level3.owl#Pathway","http://www.biopax.org/release/biopax-level3.owl#PhysicalEntity"]
 	nestedParams = Dict{Symbol,Any}(
 		:interaction=>[:partPred,:intDisplayName],
-		:biochemInteraction=>[:interaction,:intType,:intPubTitles],
+		:biochemInteraction=>[:interaction,:intType],
 		:ctrlInteraction=>[:ctrlRxn,:ctrlRxnType,:ctrlRxnDir,:ctrlRxnDisplayName],
 		:physicalEntity=>[:participantType,:participantLocRef,:participant,:displayName],
 		:simpleEntity=>[:participantEntRef,:participantEntRefType,:entId,:entIdDb,:standardName])
@@ -68,11 +84,14 @@ function expandInteractions(df::DataFrame,dbParams)
 	refs = []
 	rxns = []
 	for i in 1:size(df,1)
-		println("getting rxn $i of ", size(df,1))
+		verbose ? println("getting rxn $i of ", size(df,1)) : nothing
 		rxn = filterKeys(df[i,:],
 				   nestedParams[:interaction],
 				   nestedParams[:interaction])
-		biochemRxn = Dict(nestedParams[:biochemInteraction].=>collect(df[i,nestedParams[:biochemInteraction]]))
+		biochemRxn = filterKeys(df[i,:],
+				   		nestedParams[:biochemInteraction],
+				   		nestedParams[:biochemInteraction])
+
 		# push the participant rxn dictionary to the ref list
 		push!(refs,biochemRxn)
 		ctrlRxn = filterKeys(df[i,:],
@@ -81,26 +100,20 @@ function expandInteractions(df::DataFrame,dbParams)
 
 		entRef = df[i,:participant] # the ref for the participant entity
 
-		if df[i,:participantType] == "http://www.biopax.org/release/biopax-level3.owl#Dna"
-			println("stopping at $i")
-			#sleep(10000)
-		end
-
 		nonNested = getNested(nestedParams,entRef,
 						nestedParams[:physicalEntity],
 						nestedParams[:simpleEntity])
 		for ii in 1:length(nonNested)
 			# push the participant simple entity dictionary to the ref list
 			push!(refs,nonNested[ii])
-			if length(collect(skipmissing(values(ctrlRxn)))) > 0
+			if length(collect(skipmissing(values(ctrlRxn)))) > 0 && !any(map(x->x==df[i,:ctrlEntityType],ctrlExclude))
+
 				# push the ctrl rxn to the ref list
 				push!(refs,ctrlRxn)
 				ctrlEntRef = df[i,:ctrlEntity] # the ref for the ctrl entity
 				ctrlNonNested = getNested(nestedParams,ctrlEntRef,
 									nestedParams[:physicalEntity],
 									nestedParams[:simpleEntity])
-
-
 
 				for iii in 1:length(ctrlNonNested)
 					# push the ctrl simple entity dictionary to the ref list
@@ -122,7 +135,8 @@ function expandInteractions(df::DataFrame,dbParams)
 			end
 		end
 	end
-	(unique(refs),rxns)
+	(refs=refs,rxns=rxns)
+	# (unique(refs),rxns)
 end
 
 # calls initGraph(df::DataFrame,dbParams::Dict)
@@ -139,9 +153,10 @@ function initGraph(refs::Vector,dbParams::Dict)
 end
 
 # initialize the graph
-function initGraph(refs,rxns)
+function initGraph(refs,rxns;verbose=false)
 	# what reactions to consider
 	rxtypes = ["http://www.biopax.org/release/biopax-level3.owl#ComplexAssembly",
+			   "http://www.biopax.org/release/biopax-level3.owl#TemplateReaction",
 			   "http://www.biopax.org/release/biopax-level3.owl#Transport",
 			   "http://www.biopax.org/release/biopax-level3.owl#BiochemicalReaction",
 			   "http://www.biopax.org/release/biopax-level3.owl#TransportWithBiochemicalReaction"]
@@ -162,13 +177,15 @@ function initGraph(refs,rxns)
 		p_ind = findVertex(g,p_dict)
 		if any(occursin.(rx_dict[:intType],rxtypes))
 			if base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#left"
-				addEdge!(g,p_ind,rx_ind,Dict(:eType=>"biochemInput"),false)
+				addEdge!(g,p_ind,rx_ind,Dict(:eType=>"biochemInput"))
 			elseif base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#right"
-				addEdge!(g,rx_ind,p_ind,Dict(:eType=>"biochemOutput"),false)
+				addEdge!(g,rx_ind,p_ind,Dict(:eType=>"biochemOutput"))
+			elseif base_dict[:partPred] == "http://www.biopax.org/release/biopax-level3.owl#product"
+				addEdge!(g,rx_ind,p_ind,Dict(:eType=>"templateProduct"))
 			end
 		else
 			rtype = rx_dict[:intType]
-			println("rxn $i unsupported rx type $rtype")
+			verbose ? println("rxn $i unsupported rx type $rtype") : nothing
 		end
 
 		# add the control rxn if any
@@ -177,8 +194,8 @@ function initGraph(refs,rxns)
 			ctrl_p_dict = rxns[i][:ctrlEntity]
 			ctrl_rx_ind = findVertex(g,ctrl_rx_dict)
 			ctrl_p_ind = findVertex(g,ctrl_p_dict)
-			addEdge!(g,ctrl_p_ind,ctrl_rx_ind,Dict(:eType=>"controller"),false)
-			addEdge!(g,ctrl_rx_ind,rx_ind,Dict(:eType=>"catalysis"),false)
+			addEdge!(g,ctrl_p_ind,ctrl_rx_ind,Dict(:eType=>"controller"))
+			addEdge!(g,ctrl_rx_ind,rx_ind,Dict(:eType=>"catalysis"))
 		end
 	end
 
@@ -189,7 +206,7 @@ function initGraph(refs,rxns)
 				masterlist = Vector{Vector{Int64}}()
 				appendTree!(g,i,masterlist,Dict(:eType=>"cxTree"))
 				set_props!(g,i,Dict(:vertShell=>masterlist))
-				println(string("updated props for cx $i: ",reduce(vcat,masterlist)))
+				verbose ? println(string("updated props for cx $i: ",reduce(vcat,masterlist))) : nothing
 			end
 		end
 	end
@@ -219,7 +236,7 @@ function appendTree!(g::AbstractMetaGraph,parentInd::Int,edgeProps)
 	children = props(g,parentInd)[:members]
 	for c in children
 		cInd = addVertex!(g,c)
-		addEdge!(g,cInd,parentInd,edgeProps,false)
+		addEdge!(g,cInd,parentInd,edgeProps)
 		if haskey(c,:members)
 			appendTree!(g,cInd)
 			rem_prop!(g,cInd,:members)
@@ -244,7 +261,7 @@ function traverseNodeDict!(g::AbstractMetaGraph,parentInd::Int,nlist,edgeProps)
 	c_nlist=[]
 	for c in children
 		cInd = addVertex!(g,c)
-		addEdge!(g,cInd,parentInd,edgeProps,false)
+		addEdge!(g,cInd,parentInd,edgeProps)
 		if haskey(c,:members)
 			push!(nlist,traverseNodeDict!(g,cInd,c_nlist,edgeProps))
 			# rem_prop!(g,cInd,:members)

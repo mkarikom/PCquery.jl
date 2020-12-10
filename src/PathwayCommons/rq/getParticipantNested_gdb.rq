@@ -42,10 +42,6 @@ WHERE
                                  bp:xref [ a bp:UnificationXref ;
                                            bp:id ?entId ;
 																					 bp:db ?entIdDb ] .
-				OPTIONAL
-				{
-					?participantEntRef bp:standardName ?standardName .
-				}
   }
 #    FILTER(BOUND(?participantRef))
 }limit 100
