@@ -2,13 +2,11 @@ function addEdge!(g::AbstractMetaGraph,source::Int,dest::Int,
 					eProps::Dict;verbose=false)
 	hasedge = has_edge(g, source, dest)
 	if hasedge
-		if debug
-			verbose ? println("\n\nedge $source -> $dest already exists") : nothing
-		end
+		verbose ? println("\n\nedge $source -> $dest already exists") : nothing
 	else
 		added = add_edge!(g,source,dest)
 		set_props!(g,source,dest,eProps)
-		@assert added "edge $source -> $dest error"
+		@assert added "edge $source -> $dest could not be added"
 	end
 end
 

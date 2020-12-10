@@ -26,7 +26,7 @@ export delimitValues
 export getNextProt, annotateGraphFcn!,annotateGraphP!, annotateGraphG!
 
 # orthodb module
-export addExpression,selectOrthologs!,getOrthoDist
+export addExpression,selectOrthologs!,getOrthDist
 
 # Pathway Commons
 export requestTTL, topPathsGet, getHttp, searchPathsGet
