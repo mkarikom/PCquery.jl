@@ -6,7 +6,7 @@ PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
 
 SELECT DISTINCT *
 
-FROM <http://www.ontotext.com/explicit>
+{{{fromgraph}}}
 
 WHERE {
 		?cx a bp:Complex .
@@ -14,7 +14,13 @@ WHERE {
 		VALUES ?cx {{{cx}}}
 
 		?comp ^(bp:memberPhysicalEntity|bp:component) ?cx ;
-					a ?compType ;
-     				bp:cellularLocation [ bp:xref ?participantLocRef ] .
-    	?cx bp:cellularLocation [ bp:xref ?cxLocRef ] .
+					a ?compType .
+		OPTIONAL
+		{
+			?comp bp:cellularLocation [ bp:xref ?participantLocRef ] .
+		}
+		OPTIONAL
+		{
+			?cx bp:cellularLocation [ bp:xref ?cxLocRef ] .
+		}
 }

@@ -1,14 +1,12 @@
 function addEdge!(g::AbstractMetaGraph,source::Int,dest::Int,
-					eProps::Dict,debug::Bool)
+					eProps::Dict;verbose=false)
 	hasedge = has_edge(g, source, dest)
 	if hasedge
-		if debug
-			println("\n\nedge $source -> $dest already exists")
-		end
+		verbose ? println("\n\nedge $source -> $dest already exists") : nothing
 	else
 		added = add_edge!(g,source,dest)
 		set_props!(g,source,dest,eProps)
-		@assert added "edge $source -> $dest error"
+		@assert added "edge $source -> $dest could not be added"
 	end
 end
 
@@ -94,6 +92,25 @@ function filterVertices(g::AbstractMetaGraph,k::Symbol,f::Function)
 			if f(props(g,v)[k])
 				push!(resultVec,v)
 			end
+		end
+	end
+	resultVec
+end
+
+# as above but evaluate functions on multiple keys
+# filt is a vector of pairs
+function filterVertices(g::AbstractMetaGraph,filt)
+	resultVec = Vector{eltype(collect(vertices(g)))}()
+	for v in vertices(g)
+		evals = []
+		for f_i in 1:length(filt)
+			vp = props(g,v)
+			if filt[f_i](vp)
+				push!(evals,true)
+			end
+		end
+		if length(evals) > 0 && length(evals) == length(filt)
+			push!(resultVec,v)
 		end
 	end
 	resultVec

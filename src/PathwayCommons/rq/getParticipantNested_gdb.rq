@@ -6,7 +6,9 @@ PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
 
 
 SELECT DISTINCT *
-FROM <http://www.ontotext.com/explicit>
+
+{{{fromgraph}}}
+
 WHERE
 {
 # VALUES ?superEntity {<http://pathwaycommons.org/pc11/#Protein_012dcb9b7677f040bfebd8c0e03a6eae>} #ub
@@ -17,21 +19,29 @@ WHERE
 # VALUES ?superEntity {<http://pathwaycommons.org/pc11/#Dna_84fd7c722584087e9e5615c4e8c31783>} # nested dna
 # VALUES ?superEntity {<http://pathwaycommons.org/pc11/#SmallMolecule_5a039c428c8ffb03a8431e1334a39ef9>} # non nested small molecule (does not work with superEntity)
 	VALUES ?superEntity {{{ent}}}
-        ?participant ^bp:memberPhysicalEntity ?superEntity ;
-        		a ?participantType ;
-                bp:xref ?participantRef ;
-                bp:cellularLocation [ bp:xref ?participantLocRef ] .
-        ?participantRef a bp:UnificationXref ;
-                        bp:db ?dbname ;
-                        bp:id ?id.
-        OPTIONAL
-        {
-                ?participant bp:entityReference ?participantEntRef .
-            	?participantEntRef a ?participantEntRefType ;
-                                       bp:xref [ a bp:UnificationXref ;
-                                                 bp:id ?entId;
-																								 bp:db ?entIdDb ] .
-        }
+	?participant ^bp:memberPhysicalEntity ?superEntity ;
+ 		     a ?participantType .
+	OPTIONAL
+	{
+		?participant bp:cellularLocation [ bp:xref ?participantLocRef ] .
+	}
+	OPTIONAL
+	{
+		?participant bp:xref ?participantRef ;
+			     bp:displayName ?displayName .
 
-    FILTER(BOUND(?participantRef))
+	        ?participantRef a bp:UnificationXref ;
+	                        bp:db ?dbname ;
+	                        bp:id ?id.
+	}
+
+  OPTIONAL
+  {
+          ?participant bp:entityReference ?participantEntRef .
+      	?participantEntRef a ?participantEntRefType ;
+                                 bp:xref [ a bp:UnificationXref ;
+                                           bp:id ?entId ;
+																					 bp:db ?entIdDb ] .
+  }
+#    FILTER(BOUND(?participantRef))
 }limit 100

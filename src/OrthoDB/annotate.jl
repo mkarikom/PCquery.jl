@@ -26,7 +26,7 @@ function annotatePathway!(graph::AbstractMetaGraph,dbParams::Dict)
 	(df=df,ids=ids,verts=verts)
 end
 
-function addOrthoDist!(graph::AbstractMetaGraph,verts,eids,ogs)
+function addOrthoDist!(graph::AbstractMetaGraph,verts,eids,ogs;verbose=false)
 	# update the graph
 	dstr = unique(ogs[!,:orthoDist])
 	for ind in 1:length(verts)
@@ -41,7 +41,7 @@ function addOrthoDist!(graph::AbstractMetaGraph,verts,eids,ogs)
 				  @collect DataFrame
 				end
 			if size(ogd)[1] > 0
-				println("adding dist ind $ind vert $vi uid $uid dist $di, ortholog count is ",size(ogd)[1])
+				verbose ? println("adding dist ind $ind vert $vi uid $uid dist $di, ortholog count is ",size(ogd)[1]) : nothing
 				genes = []
 				for g in unique(ogd[!,:orthoDBId])
 					ogg = @from i in ogd begin
@@ -57,7 +57,7 @@ function addOrthoDist!(graph::AbstractMetaGraph,verts,eids,ogs)
 										values(ogg[1,geneFeat])))
 					upids = []
 					for op in unique(ogg.orthoEntId)
-						# println("update ortho distance $di for vertex $vi, gene $g, protein $op")
+						verbose ? println("update ortho distance $di for vertex $vi, gene $g, protein $op") : nothing
 						push!(upids,op)
 					end
 					gene[:orthoEntIds] = Tuple(upids)
@@ -70,7 +70,7 @@ function addOrthoDist!(graph::AbstractMetaGraph,verts,eids,ogs)
 				# push!(dists,og)
 				dists[parse(Int64,di)]=og
 			else
-				println("no orthologs reported for ind $ind vert $vi uid $uid at dist $di")
+				verbose ? println("no orthologs reported for ind $ind vert $vi uid $uid at dist $di") : nothing
 			end
 		end
 
@@ -78,7 +78,7 @@ function addOrthoDist!(graph::AbstractMetaGraph,verts,eids,ogs)
 			msg = set_props!(graph,verts[ind],Dict(:orthoDist=>dists))
 			@assert msg == true "failed to add orthodb for vertex upid"
 		else
-			println("no orthologs reported for ind $ind vert $vi uid $uid")
+			verbose ? println("no orthologs reported for ind $ind vert $vi uid $uid") : nothing
 		end
 	end
 end
@@ -89,7 +89,7 @@ function addExpression(graph::AbstractMetaGraph,
 						df::DataFrame,
 						key::Symbol,
 						modality::Symbol,
-						barcode::String)
+						barcode::String;verbose=false)
 	# get vertices with orthologs
 	g = deepcopy(graph)
 	sv = filterVertices(g,:orthoDist,v->true)
@@ -108,9 +108,9 @@ function addExpression(graph::AbstractMetaGraph,
 					mem[modality] = Dict(:accession=>get(mem,key,""),
 										 :barcode=>barcode,
 										 :value=>df[indbc,ind])
-					# println("added gene:$ind, barcode:$indbc")
+					verbose ? println("added gene:$ind, barcode:$indbc") : nothing
 				else
-					# println("cannot add gene:$ind, barcode $indbc")
+					verbose ? println("cannot add gene:$ind, barcode $indbc") : nothing
 				end
 
 			end
@@ -124,7 +124,7 @@ end
 function addExpression(graph::AbstractMetaGraph,
 						dfrow::DataFrameRow,
 						key::Symbol,
-						modality::Symbol)
+						modality::Symbol;verbose=false)
 	# get vertices with orthologs
 	barcode = dfrow[:barcode]
 	g = deepcopy(graph)
@@ -144,12 +144,35 @@ function addExpression(graph::AbstractMetaGraph,
 					mem[modality] = Dict(:accession=>get(mem,key,""),
 										 :barcode=>dfrow[:barcode],
 										 :value=>dfrow[ind])
-					# println("added $gnn = feature:$ind, barcode:$barcode")
+					verbose ? println("added $gnn = feature:$ind, barcode:$barcode") : nothing
 				else
-					# println("not found $gnn, barcode $barcode")
+					verbose ? println("not found $gnn, barcode $barcode") : nothing
 				end
 			end
 		end
 	end
 	g
+end
+
+# get all orthologs at the specified distance
+# ensemble gene ids are not always available from orthodb so omit them here
+function getOrthDist(g,v,dist;verbose=false)
+    hgnc = []
+    upid = []
+    if haskey(props(g,v),:orthoDist) && haskey(props(g,v)[:orthoDist],dist) && haskey(props(g,v)[:orthoDist][dist],:members)
+        vorth = props(g,v)[:orthoDist][dist][:members]
+        if typeof(vorth) <: NTuple && length(vorth) > 0
+            verbose ? println("length of vorth is ",length(vorth)) : nothing
+            for o in vorth
+                verbose ? println("saving ids") : nothing
+                push!(hgnc,o[:orthoHGNC])
+                push!(upid,o[:orthoEntIds]...)
+            end
+        else
+            verbose ? println("ortholog group is empty or unreadable") : nothing
+        end
+    else
+        verbose ? println("orthoDist missing") : nothing
+    end
+    (hgnc=hgnc,upid=upid)
 end
