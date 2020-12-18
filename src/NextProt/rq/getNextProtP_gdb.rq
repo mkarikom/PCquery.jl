@@ -11,11 +11,7 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX unipage: <http://www.uniprot.org/uniprot/>
 PREFIX ns0: <http://nextprot.org/rdf#>
 
-SELECT DISTINCT ?uniprot ?goAncestor
-               (GROUP_CONCAT(DISTINCT ?goTerm;SEPARATOR=",") AS ?goTerms)
-               (GROUP_CONCAT(DISTINCT ?isoform;SEPARATOR=",") AS ?isoforms)
-               (GROUP_CONCAT(DISTINCT ?entry;SEPARATOR=",") AS ?entries)
-# SELECT DISTINCT *
+SELECT DISTINCT *
 
 # FROM <http://www.ontotext.com/explicit>
 {{{fromgraph}}}
@@ -24,12 +20,8 @@ WHERE {
         ?entry a np:Entry ;
                np:swissprotPage ?uniprot ;
                ns0:gene ?gene ;
-               np:isoform ?isoform .
-        ?isoform np:goMolecularFunction/np:term/np:childOf ?goAncestor ;
-                 np:goMolecularFunction/np:term ?goTerm
-         VALUES ?goAncestor {{{goFilter}}}
-        # VALUES ?goAncestor {<http://nextprot.org/rdf/terminology/GO_0038023>}
-         VALUES ?uniprot {{{entityFilter}}}
-        # VALUES ?uniprot {<http://identifiers.org/uniprot/P46531>}
+               ns0:isoform ?isoform .
+    	?gene ns0:name ?gname .
+
+        VALUES ?uniprot {{{unipage}}}
 }
-GROUP BY ?uniprot ?goAncestor

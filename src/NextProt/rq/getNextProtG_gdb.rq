@@ -10,16 +10,19 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX unipage: <http://www.uniprot.org/uniprot/>
 PREFIX ns0: <http://nextprot.org/rdf#>
+PREFIX gene: <http://nextprot.org/rdf/gene/>
 
 SELECT DISTINCT *
 
-FROM <http://www.ontotext.com/explicit>
+# FROM <http://www.ontotext.com/explicit>
+{{{fromgraph}}}
+
 WHERE {
         ?entry a np:Entry ;
                np:swissprotPage ?uniprot ;
-               ns0:gene ?gene .
+               ns0:gene ?gene ;
+               ns0:isoform ?isoform .
+    	?gene ns0:name ?gname .
 
-        # VALUES ?goAncestor {{{goFilter}}}
-        VALUES ?uniprot {{{unipage}}}
-         # VALUES ?uniprot {unipage:P46531}
+        VALUES ?gene {{{gene}}}
 }

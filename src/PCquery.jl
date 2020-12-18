@@ -1,30 +1,44 @@
 module PCquery
 
 import HTTP.IOExtras
-using HTTP
+using HTTP,URIs
 using Mustache
-using LightXML,DataFrames,Query
+using TikzGraphs,TikzPictures,LaTeXStrings,ColorSchemes
+using JLD2
+using LightXML,DataFrames,Query,JSON
 using LightGraphs, MetaGraphs
 using Base.Threads
+
+
+# import/export
+export exportLRT
 
 # graphs
 export initGraph,filterVertices!,filterEdges!,filterVertices,filterEdges,initRow
 
 # pathway related
-export getTransTargs,getPathways,annotatePathway!
+export getTransTargs,getPathways,annotatePathway!,expandInteractions,getStatic,searchPathways
 
 # search
 export delimitValues
 
 # NextProt_module
-export getNextProt, annotateGraphFcn!,annotateGraphGene!
+export getNextProt, annotateGraphFcn!,annotateGraphP!, annotateGraphG!
 
 # orthodb module
-export addExpression
+export addExpression,selectOrthologs!,getOrthDist
+
+# Pathway Commons
+export requestTTL, topPathsGet, getHttp, searchPathsGet
 
 # LRpairs_module
 export getCxLR
 
+# plotting
+export plotDagLRT, plotDag, plotDagExp
+
+include("util.jl") # saving and loading data
+include("plot.jl") # plotting
 include("http.jl") # override delimiters
 include("query.jl") # sparql tools for various endpoints
 include("graph.jl") # find paths

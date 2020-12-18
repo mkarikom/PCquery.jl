@@ -4,49 +4,104 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
 
-SELECT DISTINCT ?interaction ?participant ?intUniXrefId ?intType
-				?partPred  ?participantType
-				?participantLocRef
-				?ctrlRxn ?ctrlRxnType ?ctrlRxnDir
-				?ctrlEntity ?ctrlEntityType ?ctrlEntityLocRef
-				(GROUP_CONCAT(DISTINCT ?pw;SEPARATOR=",") AS ?pws)
+SELECT DISTINCT
+	?pw
+	?displayNamePw
+	?interaction
+	?intDisplayName
+	?intType
+	?partPred
+	?participant
+	?participantType
+	?ctrlRxn
+	?ctrlRxnDisplayName
+	?ctrlRxnType
+	?ctrlRxnDir
+	?ctrlEntity
+	?ctrlEntityType
+	?ctrlEntityLocRef
+	(GROUP_CONCAT(DISTINCT ?intPubTitle;SEPARATOR=",") AS ?intPubTitles)
+	(GROUP_CONCAT(DISTINCT ?intPubDb;SEPARATOR=",") AS ?intPubDbs)
+	(GROUP_CONCAT(DISTINCT ?intPubId;SEPARATOR=",") AS ?intPubIds)
 
-FROM <http://www.ontotext.com/explicit>
+#
+{{{fromgraph}}}
 
 WHERE {
-    ?pw bp:xref [ a bp:UnificationXref ;
-                  bp:db ?pwUniXrefDb ;
-                  bp:id ?pwUniXrefId] ;
-        bp:pathwayComponent* ?interaction .
-	#  VALUES ?pwUniXrefId {"R-HSA-2122948"^^xsd:string "R-HSA-2122947"^^xsd:string}
-	VALUES ?pwUniXrefId {{{pathVals}}}
+#VALUES ?pw {<http://identifiers.org/reactome/R-HSA-2122948> <http://identifiers.org/reactome/R-HSA-2122947>}
+#VALUES ?pw {<http://pathwaycommons.org/pc12/Pathway_b63e3e30297acb0ab2fec4250c1eb294> <http://pathwaycommons.org/pc12/Pathway_a655fac45ae26a6f8ab1542352531b8c>}
 
-    	?intType ^a ?interaction ;
-                          rdfs:subClassOf+ bp:Interaction .
-    	?interaction bp:xref [ a bp:UnificationXref ;
-                             		   bp:db ?intUniXrefDb ;
-                             	       bp:id ?intUniXrefId ] ;
+	VALUES ?pw {{{pathVals}}}
+	VALUES ?intType {bp:Catalysis
+											 bp:Modulation
+											 bp:TemplateReaction
+											 bp:TemplateReactionRegulation
+											 bp:BiochemicalReaction
+										   bp:ComplexAssembly
+										   bp:Degradation
+										   bp:Transport
+										   bp:TransportWithBiochemicalReaction}
+	?pw a bp:Pathway ;
+					bp:pathwayComponent* ?interaction .
+	?partPred rdfs:subPropertyOf bp:participant .
+	?intType rdfs:subClassOf+ bp:Interaction .
+	FILTER NOT EXISTS { ?intType rdfs:subClassOf+ bp:Control }
+	?interaction ?partPred ?participant ;
+							 a ?intType .
+	?participant a ?participantType .
+	OPTIONAL
+	{
+		?interaction bp:xref [ a bp:PublicationXref ;
+		bp:title ?intPubTitle ;
+		bp:id ?intPubId ;
+		bp:db ?intPubDb] .
+	}
 
-                ?partPred ?participant .
-	    ?partPred rdfs:subPropertyOf bp:participant .
-        ?participant a ?participantType ;
-	 				 bp:cellularLocation [ bp:xref ?participantLocRef ] .
+		OPTIONAL
+		{
+		 ?interaction bp:displayName ?intDisplayName .
+		}
+ 		OPTIONAL
+		{
+			?pw bp:displayName ?displayNamePw .
+		}
 
-	 		OPTIONAL { ?interaction ^bp:controlled ?ctrlRxn .
-	         		   ?ctrlRxn a ?ctrlRxnType .
-	             OPTIONAL {
-	 			 				 ?ctrlRxn bp:controlType ?ctrlRxnDir ;
-	 												bp:controller ?ctrlEntity .
-	 							 ?ctrlEntity a ?ctrlEntityType ;
-  	 										 bp:cellularLocation [ bp:xref ?ctrlEntityLocRef ] .
-	             }
+    OPTIONAL {
+        ?interaction ^bp:controlled ?ctrlRxn .
+        ?ctrlRxn a ?ctrlRxnType .
+#        ?ctrlRxnType rdfs:subClassOf bp:Control .
+				OPTIONAL
+				{
+				 ?ctrlRxn bp:displayName ?ctrlRxnDisplayName .
+				}
+        OPTIONAL {
+            ?ctrlRxn bp:controlType ?ctrlRxnDir ;
+                     bp:controller ?ctrlEntity .
+            ?ctrlEntity a ?ctrlEntityType .
+            OPTIONAL {
+                       ?ctrlEntity bp:cellularLocation [ bp:xref ?ctrlEntityLocRef ] .
+            }
+        }
 
-	         }
+    }
+#    FILTER(BOUND(?ctrlRxn))
 }
 
-GROUP BY ?interaction
-				?intUniXrefId ?intType
-				?partPred ?participant ?participantType
-				?participantLocRef
-				?ctrlRxn ?ctrlRxnType ?ctrlRxnDir
-				?ctrlEntity ?ctrlEntityType ?ctrlEntityLocRef
+GROUP BY ?pw
+				 ?displayNamePw
+				 ?interaction
+				 ?intDisplayName
+				 ?intType
+				 ?partPred
+				 ?participant
+				 ?participantType
+				 ?ctrlRxn
+				 ?ctrlRxnDisplayName
+				 ?ctrlRxnType
+				 ?ctrlRxnDir
+				 ?ctrlEntity
+				 ?ctrlEntityType
+				 ?ctrlEntityLocRef
+ORDER BY ?pw ?participant ?interaction
+LIMIT {{{resultLim}}}
+OFFSET {{{resultOffset}}}
