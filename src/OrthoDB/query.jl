@@ -19,22 +19,23 @@ function getOrthoDB(dbParams::Dict)
     ann = parseSparqlResponse(resp)
 end
 
-function preGetOrthoDB!(q,origids,dbParams,df)
+function preGetOrthoDB!(q,origids,dbParams,df;verbose=false)
 	firstind = findfirst(x->x==q[1],origids)
 	lastind = findfirst(x->x==q[end],origids)
 	entFilter = delimitValues(q,dbParams[:entpfxs],"")
 	dbParams[:entid] = entFilter
-	println("retrieving ids $firstind : $lastind")
+	verbose ? println("retrieving ids $firstind : $lastind") : nothing
 	append!(df,getOrthoDB(dbParams))
 end
 
 # serially process a list of uniprot ids
 function selectOrthologs!(endids,dbParams::Dict,df::DataFrame)
 	origids = copy(endids)
+	queueids = copy(endids)
 	q = []
-	while length(endids) > 0
+	while length(queueids) > 0
 		if length(q) < dbParams[:maxq]
-			id = popat!(endids,1,missing)
+			id = popat!(queueids,1,missing)
 			if !ismissing(id)
 				push!(q,id)
 			else

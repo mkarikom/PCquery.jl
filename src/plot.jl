@@ -1,4 +1,4 @@
-function plotDag(g::AbstractGraph,gParams::Dict)
+function plotDag(g::AbstractGraph,gParams::Dict;verbose=false)
     nodelabels = Vector{String}(undef,0)
     nodestyles = Dict{Int64,String}()
     edgelabels = Dict{Tuple{Int64,Int64},String}()
@@ -6,19 +6,19 @@ function plotDag(g::AbstractGraph,gParams::Dict)
     # apply default vertex styles
     for v in 1:nv(g)
         if haskey(props(g,v),:displayName)
-            println("adding $v")
+            verbose ? println("adding $v") : nothing
             nlab = join([v,props(g,v)[:displayName]],":")
             push!(nodestyles,v=>"fill=white")
-        elseif haskey(props(g,v),:displayNameIntxn)
-            println("adding $v")
-            nlab = join([v,props(g,v)[:displayNameIntxn]],":")
+        elseif haskey(props(g,v),:intPubTitles)
+            verbose ? println("adding $v") : nothing
+            nlab = join([v,props(g,v)[:intPubTitles]],":")
             push!(nodestyles,v=>"fill=white")
         elseif haskey(props(g,v),:entId)
-            println("adding $v")
+            verbose ? println("adding $v") : nothing
             nlab = join([v,props(g,v)[:entId]],":")
             push!(nodestyles,v=>"fill=white")
         else
-            println("adding $v")
+            verbose ? println("adding $v") : nothing
             nlab = "$v"
             push!(nodestyles,v=>"fill=white")
         end
@@ -51,7 +51,7 @@ function plotDag(g::AbstractGraph,gParams::Dict)
         s = src(e)
         d = dst(e)
         et = (s,d)
-        println("found edge $s -> $d")
+        verbose ? println("found edge $s -> $d") : nothing
         push!(edgestyles,et=>"black")
         push!(edgelabels,et=>"")
     end
@@ -81,7 +81,7 @@ function plotDag(g::AbstractGraph,gParams::Dict)
             d = dst(e)
             if any(in.(s,eval(gParams[:highlightedges]))) && any(in.(d,eval(gParams[:highlightedges])))
                 et = (s,d)
-                println("highlighting edge $s -> $d")
+                verbose ? println("highlighting edge $s -> $d") : nothing
                 push!(edgestyles,et=>"red,line width=1em")
                 push!(edgelabels,et=>"")
             end
@@ -93,7 +93,7 @@ function plotDag(g::AbstractGraph,gParams::Dict)
     map!(l->replace(l,  r"(\_)" => s"\\\1"), values(edgelabels))
 
 
-    println("rendering plot")
+    verbose ? println("rendering plot") : nothing
     gp = TikzGraphs.plot(DiGraph(g),gParams[:lt],nodelabels,
                     node_style="draw,rounded corners",
                     node_styles=nodestyles,
@@ -109,14 +109,14 @@ function plotDag(g::AbstractGraph,gParams::Dict)
     elseif split(gParams[:fname],".")[end] == "pdf"
         TikzPictures.save(PDF(gParams[:fname]), gp)
     else
-        println("unknown output format: ",split(gParams[:fname],".")[end])
+        verbose ? println("unknown output format: ",split(gParams[:fname],".")[end]) : nothing
         throw(error())
     end
     gp
 end
 
 # create a colorscale for the plot based on max value orthologs across all nodes
-function plotDagExp(g::AbstractGraph,gParams::Dict)
+function plotDagExp(g::AbstractGraph,gParams::Dict;verbose=false)
     nodequants = Vector{Union{Missing,Float64}}(undef,0)
     nodelabels = Vector{String}(undef,0)
     nodestyles = Dict{Int64,String}()
@@ -134,28 +134,36 @@ function plotDagExp(g::AbstractGraph,gParams::Dict)
     for v in 1:nv(g)
         quantmax = missing
         if haskey(props(g,v),:orthoDist)
-            vorth = props(g,v)[:orthoDist][gParams[:orthodist]][:members]
-            if length(vorth) > 0
-                println("length of vorth is ",length(vorth))
-                # for o in 1:length(vorth)
-                #     if haskey(vorth[o],:rnaSeq)
-                #     end
-                # end
-                if length(collect(skipmissing([haskey(vorth[o],:rnaSeq) ? vorth[o][:rnaSeq][:value] : missing for o in 1:length(vorth)]))) > 0
-                    quantmax = reduce(max,skipmissing([haskey(vorth[o],:rnaSeq) ? vorth[o][:rnaSeq][:value] : missing for o in 1:length(vorth)]))
-                    println(quantmax)
+            if haskey(props(g,v)[:orthoDist],gParams[:orthodist])
+                vorth = props(g,v)[:orthoDist][gParams[:orthodist]][:members]
+                if length(vorth) > 0
+                    verbose ? println("length of vorth is ",length(vorth)) : nothing
+                    # for o in 1:length(vorth)
+                    #     if haskey(vorth[o],:rnaSeq)
+                    #     end
+                    # end
+                    if length(collect(skipmissing([haskey(vorth[o],:rnaSeq) ? vorth[o][:rnaSeq][:value] : missing for o in 1:length(vorth)]))) > 0
+                        quantmax = reduce(max,skipmissing([haskey(vorth[o],:rnaSeq) ? vorth[o][:rnaSeq][:value] : missing for o in 1:length(vorth)]))
+                        verbose ? println(quantmax) : nothing
+                    else
+                        verbose ? println("no expression of ortholog") : nothing
+                    end
                 else
-                    println("no expression of ortholog")
+                    verbose ? println("vorth is empty") : nothing
                 end
             else
-                println("vorth is empty")
+                verbose ? println("orthoDist=",gParams[:orthodist]," missing") : nothing
             end
         else
-            println("orthoDist missing")
+            verbose ? println("all orthoDist missing") : nothing
         end
         push!(nodequants,quantmax)
     end
     # derive a log colorscale for the expression values
+    if length(collect(skipmissing(nodequants))) == 0
+        verbose ? println("no orthologs at dist=",gParams[:orthodist]," detected, exiting") : nothing
+        return nothing
+    end
     scaledquants = copy(nodequants)
     if gParams[:scale] == :log
         logquants = log.(collect(skipmissing(nodequants)).+1)
@@ -189,16 +197,16 @@ function plotDagExp(g::AbstractGraph,gParams::Dict)
 
         # set node labels
         if haskey(props(g,v),:displayName)
-            println("adding $v")
+            verbose ? println("adding $v") : nothing
             nlab = join([v,props(g,v)[:displayName]],":")
-        elseif haskey(props(g,v),:displayNameIntxn)
-            println("adding $v")
-            nlab = join([v,props(g,v)[:displayNameIntxn]],":")
+        elseif haskey(props(g,v),:intPubTitles)
+            verbose ? println("adding $v") : nothing
+            nlab = join([v,props(g,v)[:intPubTitles]],":")
         elseif haskey(props(g,v),:entId)
-            println("adding $v")
+            verbose ? println("adding $v") : nothing
             nlab = join([v,props(g,v)[:entId]],":")
         else
-            println("adding $v")
+            verbose ? println("adding $v") : nothing
             nlab = "$v"
         end
         if length(nlab) > gParams[:nodelabelmax]
@@ -224,7 +232,7 @@ function plotDagExp(g::AbstractGraph,gParams::Dict)
         s = src(e)
         d = dst(e)
         et = (s,d)
-        println("found edge $s -> $d")
+        verbose ? println("found edge $s -> $d") : nothing
         push!(edgestyles,et=>"black")
         push!(edgelabels,et=>"")
     end
@@ -264,7 +272,7 @@ function plotDagExp(g::AbstractGraph,gParams::Dict)
     elseif split(gParams[:fname],".")[end] == "pdf"
         TikzPictures.save(PDF(gParams[:fname]), gp)
     else
-        println("unknown output format: ",split(gParams[:fname],".")[end])
+        verbose ? println("unknown output format: ",split(gParams[:fname],".")[end]) : nothing
         throw(error())
     end
     gp

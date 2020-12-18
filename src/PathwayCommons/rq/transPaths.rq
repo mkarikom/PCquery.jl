@@ -1,0 +1,37 @@
+PREFIX wp:    <http://vocabularies.wikipathways.org/wp#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bp: <http://www.biopax.org/release/biopax-level3.owl#>
+
+SELECT DISTINCT ?pw1 ?pw2 ?displayNamePw1 ?displayNamePw2
+
+WHERE {
+    ?pw1 a bp:Pathway ;
+        bp:pathwayComponent* ?interaction1 .
+    ?partPred1 rdfs:subPropertyOf bp:participant .
+    ?intType1 rdfs:subClassOf+ bp:Interaction .
+    ?interaction1 ?partPred1 ?participant ;
+                 a ?intType1 .
+
+    ?participant a ?participantType .
+
+    VALUES ?participantType {bp:Protein bp:Complex}
+
+    ?pw2 a bp:Pathway ;
+        bp:pathwayComponent* ?interaction2 .
+    ?partPred2 rdfs:subPropertyOf bp:participant .
+    ?intType2 rdfs:subClassOf+ bp:Interaction .
+    VALUES ?intType2 {bp:TemplateReaction}
+    ?interaction2 ?partPred2 ?participant ;
+                 a ?intType2 .
+    FILTER(?pw1 != ?pw2) .
+    OPTIONAL
+    {
+        ?pw1 bp:displayName ?displayNamePw1 .
+    }
+    OPTIONAL
+    {
+        ?pw2 bp:displayName ?displayNamePw2 .
+    }
+}

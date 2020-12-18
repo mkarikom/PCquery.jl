@@ -13,7 +13,9 @@ PREFIX ns0: <http://nextprot.org/rdf#>
 
 SELECT DISTINCT *
 
-FROM <http://www.ontotext.com/explicit>
+# FROM <http://www.ontotext.com/explicit>
+{{{fromgraph}}}
+
 WHERE {
         ?entry a np:Entry ;
                np:swissprotPage ?uniprot ;
