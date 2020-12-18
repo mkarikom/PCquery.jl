@@ -17,7 +17,9 @@ SELECT DISTINCT ?uniprot ?goAncestor
                (GROUP_CONCAT(DISTINCT ?entry;SEPARATOR=",") AS ?entries)
 # SELECT DISTINCT *
 
-FROM <http://www.ontotext.com/explicit>
+# FROM <http://www.ontotext.com/explicit>
+{{{fromgraph}}}
+
 WHERE {
         ?entry a np:Entry ;
                np:swissprotPage ?uniprot ;

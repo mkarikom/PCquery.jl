@@ -1,4 +1,8 @@
-function delimitValues(iris,domain::String,wrap)
+function delimitValues(iris,domain::String,wrap;prependhash=false)
+	# some pathway commons rdf xml dumps specify "#" after base uri, add this manually to pre-stored or GET requested URI from pathway commons site, where there are no "#" in the URI
+	if prependhash
+		iris = map(x->joinpath(split(x,"/")[1:end-1]...,string("#",split(x,"/")[end])),iris)
+	end
 	if length(wrap) > 0
 		xs = string.(wrap[1],domain,iris,wrap[2])
 	else
@@ -14,7 +18,10 @@ function delimitValues(iris,domain::String,wrap)
 	end
 end
 
-function delimitValues(iris::Vector,domain::String)
+function delimitValues(iris::Vector,domain::String;prependhash=false)
+	if prependhash
+		iris = map(x->joinpath(split(x,"/")[1:end-1]...,string("#",split(x,"/")[end])),iris)
+	end
 	xs = string.(domain,iris)
 	xs = join(xs," ")
 	xs = "{$xs}"
@@ -145,7 +152,7 @@ function initRow(allkeys::Vector{Symbol},dkeys::Vector{Symbol},data::Tuple)
     Dict(tuples)
 end
 
-function getNames(node)
+function getNames(node;verbose=false)
     dkeys = []
     for c in child_nodes(node)  # c is an instance of XMLNode
     if is_elementnode(c)
@@ -159,12 +166,12 @@ function getNames(node)
         v = value(a)
         cont = content(e)
         push!(dkeys,v)
-        # println("$v = $cont")
+        verbose ? println("$v = $cont") : nothing
     end end end end end end end
     unique(dkeys)
 end
 
-function getXMLres(node)
+function getXMLres(node;verbose=false)
     dkeys = getNames(node)
     if length(dkeys) > 0
         colnames = Symbol.(dkeys)
@@ -176,7 +183,7 @@ function getXMLres(node)
         if name(XMLElement(c)) == "results"
         for res in child_nodes(c)
             counter += 1
-            # println(counter)
+            verbose ? println(counter) : nothing
             node_data = []
             node_names = []
             for cres in child_nodes(res)  # c is an instance of XMLNode
@@ -188,7 +195,7 @@ function getXMLres(node)
                         cont = content(e)
                         push!(node_data,Base.strip(cont))
                         push!(node_names,Base.strip(v))
-                        # println("$v = $cont")
+                        verbose ? println("$v = $cont") : nothing
                     end
                 end
             end
@@ -202,7 +209,7 @@ function getXMLres(node)
     df
 end
 
-function getXMLres!(node,df)
+function getXMLres!(node,df;verbose=false)
     dkeys = getNames(node)
     colnames = Symbol.(dkeys)
     counter = 1
@@ -211,7 +218,6 @@ function getXMLres!(node,df)
     if name(XMLElement(c)) == "results"
     for res in child_nodes(c)
         counter += 1
-        # println(counter)
         node_data = []
         node_names = []
         for cres in child_nodes(res)  # c is an instance of XMLNode
@@ -223,7 +229,7 @@ function getXMLres!(node,df)
                     cont = content(e)
                     push!(node_data,Base.strip(cont))
                     push!(node_names,Base.strip(v))
-                    # println("$v = $cont")
+                    verbose ? println("$v = $cont") : nothing
                 end
             end
         end
@@ -233,24 +239,19 @@ function getXMLres!(node,df)
     end end end end
 end
 
-# pathway commons "top pathways" REST interface
-function getHttp(gParams::Dict)
-	uri = URIs.URI(
-			scheme=gParams[:scheme],
-			host=gParams[:host],
-			path=gParams[:path],
-			query=gParams[:query])
-	resp = HTTP.request("GET",uri)
-end
-
 # convenience get request to pc top pathways
-function topPaths(qParams::Dict)
+function topPathsGet(qParams::Dict)
 	rParams = Dict(
 			:scheme=>"https",
 			:host=>"www.pathwaycommons.org",
 			:path=>"/pc2/top_pathways.json",
 			:query=>qParams)
-	resp = getHttp(rParams)
+	uri = URIs.URI(
+			scheme=rParams[:scheme],
+			host=rParams[:host],
+			path=rParams[:path],
+			query=rParams[:query])
+	resp = HTTP.request("GET",uri)
 	parsed = JSON.parse(String(resp.body))
 	hits = parsed["searchHit"]
 	df = DataFrame(
@@ -262,7 +263,7 @@ function topPaths(qParams::Dict)
 	unique(df)
 end
 
-function getPaths(params::Dict)
+function searchPathsGet(params::Dict)
 	qParams = copy(params)
 	namefilter = nothing
 	if haskey(qParams,:filter)
@@ -273,7 +274,12 @@ function getPaths(params::Dict)
 			:host=>"www.pathwaycommons.org",
 			:path=>"/pc2/search.json",
 			:query=>qParams)
-	resp = getHttp(rParams)
+	uri = URIs.URI(
+			scheme=rParams[:scheme],
+			host=rParams[:host],
+			path=rParams[:path],
+			query=rParams[:query])
+	resp = HTTP.request("GET",uri)
 	parsed = JSON.parse(String(resp.body))
 	hits = parsed["searchHit"]
 	df = DataFrame(
