@@ -105,25 +105,3 @@ function annotateGraphG!(fcnParams::Dict,g::AbstractMetaGraph;verbose=false)
 	end
 	nothing
 end
-
-function annotateGraphLRT!(g,dbParams)
-	## annotate graph vertices with nextprot info:
-	## 1) Protein and DNA ids
-	## 2) GO molecular function
-
-	goterms = Dict("GO_0038023"=>"receptor","GO_0048018"=>"ligand")
-	fcnParams = Dict(
-		:goFilter=>delimitValues(collect(keys(goterms)),"http://nextprot.org/rdf/terminology/","<>"),
-		:dbFilter=>x->x.entId[findall(db->db=="uniprot knowledgebase",skipmissing(x.entIdDb))],
-		:annotationMapAncTerm=>x->map(t->get(goterms,split(t,"/")[end],""),skipmissing(x.goAncestor)),
-		:vertKey=>:entId,
-		:annotationKey=>:roleLR)
-	[fcnParams[k] = v for (k,v) in dbParams]
-	annLR = annotateGraphFcn!(fcnParams,g)
-
-	## annotate graph vertices with the native (eg human for pathway commons) gene ids
-	annP = annotateGraphP!(dbParams,g)
-
-	annG = annotateGraphG!(dbParams,g)
-	(lr=annLR,p=annP,g=annG)
-end
