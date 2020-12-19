@@ -23,7 +23,7 @@ export getTransTargs,getPathways,annotatePathway!,expandInteractions,getStatic,s
 export delimitValues
 
 # NextProt_module
-export getNextProt, annotateGraphFcn!,annotateGraphP!, annotateGraphG!
+export getNextProt, annotateGraphFcn!,annotateGraphP!, annotateGraphG!, annotateGraphLRT!
 
 # orthodb module
 export addExpression,selectOrthologs!,getOrthDist
