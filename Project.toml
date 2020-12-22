@@ -21,6 +21,7 @@ TikzPictures = "37f6aa50-8035-52d0-81c2-5a1d08754b2d"
 URIs = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
 
 [compat]
+ColorSchemes = "3.10"
 DataFrames = "0.22"
 HTTP = "0.9"
 JSON = "0.21"
