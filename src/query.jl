@@ -47,30 +47,6 @@ function summarizeVals(df::DataFrame, scol::Symbol, fcol::Symbol)
 	DataFrame(scol=>svals,fcol=>featvals)
 end
 
-function requestTTLold(port::Int64,fmt::String,host::String,path::String,
-					accept::String,qstr::String)
-	scheme = "http"
-	port = string(port)
-	fmt = fmt
-	#host = "nie2.math.uci.edu"
-	host = host
-	path = path
-	turtle = qstr
-
-	query = Dict("timeout"=>"0",
-	             "query"=>turtle,
-	             "debug"=>"on",
-	             "format"=>fmt)
-	uri = HTTP.URI(scheme=scheme,host=host,port=port,path=path,query=query)
-	resp = HTTP.request(:GET,uri,["Accept" => accept]);
-	#resp = HTTP.request(:GET,uri);
-	resp_str = String(resp.body);
-	xdoc = LightXML.parse_string(resp_str)
-	xroot = LightXML.root(xdoc)
-	results = PCquery.getXMLres(xroot)
-end
-
-
 function requestTTL(port::Int64,
 					scheme::String,
 					fmt::String,
@@ -82,44 +58,8 @@ function requestTTL(port::Int64,
 	port = string(port)
 	query = Dict("query"=>qstr)
 	uri = HTTP.URI(scheme=scheme,host=host,port=port,path=path)
-	resp = HTTP.request(method,uri,header,HTTP.escapeuri(query));
-end
-
-function requestTTLget(scheme::String,fmt::String,host::String,path::String,
-					accept::String,qstr::String)
-	query = Dict("timeout"=>"0",
-	             "query"=>qstr,
-	             "debug"=>"on",
-	             "format"=>fmt)
-	uri = HTTP.URI(scheme=scheme,host=host,path=path,query=query)
-	resp = HTTP.request(:GET,uri,["Accept" => accept]);
-	#resp = HTTP.request(:GET,uri);
-	resp_str = String(resp.body);
-	xdoc = LightXML.parse_string(resp_str)
-	xroot = LightXML.root(xdoc)
-	results = PCquery.getXMLres(xroot)
-end
-
-
-function requestTTL(fmt::String,
-					scheme::String,
-					host::String,
-					path::String,
-					method::Symbol,
-					header::Array{Pair{String,String},1},
-					qstr::String)
-	fmt = fmt
-	#host = "nie2.math.uci.edu"
-	host = host
-	path = path
-	turtle = qstr
-
-	query = Dict("query"=>turtle)
-
-	uri = HTTP.URI(scheme=scheme,host=host,path=path)
-	# resp = HTTP.request(:GET,uri,["Accept" => accept]);
-	resp = HTTP.request(method,uri,header,HTTP.escapeuri(query));
-	#resp = HTTP.request(:GET,uri);
+	resp = HTTP.request(method,uri,header,HTTP.escapeuri(query))
+	return resp
 end
 
 function parseSparqlResponse(resp::HTTP.Messages.Response)
@@ -128,15 +68,6 @@ function parseSparqlResponse(resp::HTTP.Messages.Response)
 	xroot = LightXML.root(xdoc)
 	results = PCquery.getXMLres(xroot)
 end
-
-function parseSparqlResponse!(resp::HTTP.Messages.Response,df)
-	resp_str = String(resp.body);
-	xdoc = LightXML.parse_string(resp_str)
-	xroot = LightXML.root(xdoc)
-	results = PCquery.getXMLres!(xroot,df)
-end
-
-
 
 # get the row-dictionary to add to the df
 function initRow(allkeys::Vector{Symbol},dkeys::Vector{Symbol},data::Tuple)
@@ -176,7 +107,7 @@ function getXMLres(node;verbose=false)
     if length(dkeys) > 0
         colnames = Symbol.(dkeys)
         coltypes = fill(Union{Missing,String},length(colnames))
-        df = DataFrame(coltypes,colnames)
+		df = DataFrame(colnames .=> [type[] for type in coltypes])
         counter = 1
         for c in child_nodes(node)  # c is an instance of XMLNode
         if is_elementnode(c)

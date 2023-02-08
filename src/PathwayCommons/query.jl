@@ -14,7 +14,7 @@ function searchPathways(dbParams::Dict;verbose=false)
     str = open(f->read(f, String), string(rqDir,"/",dbParams[:pwrqfile]));
 	cnames = [:pw,:pdn,:ds,:dsdn]
 	ctypes = [fill(Vector{Union{Missing,String}},4)...]
-	df_pairs = DataFrame(ctypes,cnames,0)
+	df_pairs = DataFrame(cnames .=> [type[] for type in ctypes])
 	lengthdf = 10000
 	offset = 0
 	while lengthdf > 0
@@ -57,7 +57,7 @@ function getPathways(dbParams::Dict;verbose=false)
     str = open(f->read(f, String), string(rqDir,"/",dbParams[:pwrqfile]));
 	cnames = [:pw,:displayNamePw,:interaction,:intDisplayName,:intType,:partPred,:participant,:particiapantType,:ctrlRxn,:ctrlRxnDisplayName,:ctrlRxnType,:ctrlRxnDir,:ctrlEntity,:ctrlEntityType,:ctrlEntityLocRef,:intPubTitles,:intPubDbs,:intPubIds]
 	ctypes = [fill(Vector{Union{Missing,String}},15)...,fill(Vector{Union{Missing,Vector{String}}},3)...]
-	df_pairs = DataFrame(ctypes,cnames,0)
+	df_pairs = DataFrame(cnames .=> [type[] for type in ctypes])
 	lengthdf = 10000
 	offset = 0
 	while lengthdf > 0
@@ -67,11 +67,12 @@ function getPathways(dbParams::Dict;verbose=false)
 												   "fromgraph"=>dbParams[:fromgraph]))
 
 	    # compose the header and execute query
-
 	    header = ["Content-Type" => "application/x-www-form-urlencoded",
 	    		  "Accept" => "application/sparql-results+xml"]
 		# add default graph uri if provided
-		haskey(dbParams,:defaultgraphuri) ? header["default-graph-uri"] = dbParams[:defaultgraphuri] : nothing
+		# haskey(dbParams,:defaultgraphuri) ? header["default-graph-uri"] = dbParams[:defaultgraphuri] : nothing # old style
+		haskey(dbParams,:defaultgraphuri) ? push!(header,"default-graph-uri"=>dbParams[:defaultgraphuri]) : nothing
+
 		# local dump of
 		resp = requestTTL(dbParams[:port],dbParams[:protocol],dbParams[:format],
 	                        dbParams[:host],dbParams[:path],dbParams[:method],
@@ -124,8 +125,7 @@ function getParticipant(dbParams::Dict,entity::String)
 			  :dbname,:id,:participantRef,
 			  :participantEntRef,:standardName,:participantEntRefType,:entId,:entIdDb]
 	ctypes = fill(Union{Missing,String},13)
-	members = DataFrame(ctypes,cnames,0)
-
+	members = DataFrame(cnames .=> [type[] for type in ctypes])
     turtle = Mustache.render(str,Dict{Any,Any}("ent"=>val,
 												"fromgraph"=>dbParams[:fromgraph]))
     # compose the header and execute query
@@ -153,7 +153,7 @@ function getComplex(dbParams::Dict,cxref::String)
 
 	cnames = [:cx,:comp,:compType,:participantLocRef,:cxLocRef]
 	ctypes = fill(Union{Missing,String},5)
-	cxEnts = DataFrame(ctypes,cnames,0)
+	cxEnts = DataFrame(cnames .=> [type[] for type in ctypes])
 
 	turtle = Mustache.render(str,Dict{Any,Any}("cx"=>val,
 											   "fromgraph"=>dbParams[:fromgraph]))

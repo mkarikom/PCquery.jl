@@ -8,14 +8,13 @@ function getOrthoDB(dbParams::Dict)
 						  "entpfx"=>dbParams[:entpfx],
 			              "gname"=>dbParams[:gname],
 						  "spname"=>dbParams[:spname]))
-    # compose the header and execute query
+	# compose the header and execute query
     header = ["Content-Type" => "application/x-www-form-urlencoded",
               "Accept" => "application/sparql-results+xml"]
     fmt = "application/sparql-results+xml"
     resp = PCquery.requestTTL(dbParams[:port],dbParams[:protocol],fmt,
                         dbParams[:host],dbParams[:path],dbParams[:method],
                         header,turtle)
-
     ann = parseSparqlResponse(resp)
 end
 
@@ -25,11 +24,12 @@ function preGetOrthoDB!(q,origids,dbParams,df;verbose=false)
 	entFilter = delimitValues(q,dbParams[:entpfxs],"")
 	dbParams[:entid] = entFilter
 	verbose ? println("retrieving ids $firstind : $lastind") : nothing
-	append!(df,getOrthoDB(dbParams))
+	odb = getOrthoDB(dbParams)
+	append!(df,odb,cols = :subset)
 end
 
 # serially process a list of uniprot ids
-function selectOrthologs!(endids,dbParams::Dict,df::DataFrame)
+function selectOrthologs!(endids,dbParams::Dict,df::DataFrame;verbose=false)
 	origids = copy(endids)
 	queueids = copy(endids)
 	q = []
@@ -39,16 +39,16 @@ function selectOrthologs!(endids,dbParams::Dict,df::DataFrame)
 			if !ismissing(id)
 				push!(q,id)
 			else
-				preGetOrthoDB!(q,origids,dbParams,df)
+				preGetOrthoDB!(q,origids,dbParams,df,verbose=verbose)
 				q = []
 			end
 		else
-			preGetOrthoDB!(q,origids,dbParams,df)
+			preGetOrthoDB!(q,origids,dbParams,df,verbose=verbose)
 			q = []
 		end
 	end
 	if length(q) > 0 # clear the queue
-		preGetOrthoDB!(q,origids,dbParams,df)
+		preGetOrthoDB!(q,origids,dbParams,df,verbose=verbose)
 	end
 	df
 end

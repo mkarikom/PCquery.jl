@@ -6,7 +6,7 @@ using Mustache
 using TikzGraphs,TikzPictures,LaTeXStrings,ColorSchemes
 using JLD2
 using LightXML,DataFrames,Query,JSON
-using LightGraphs, MetaGraphs
+using Graphs, MetaGraphs
 using Base.Threads
 
 

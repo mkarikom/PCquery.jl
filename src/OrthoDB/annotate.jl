@@ -1,4 +1,4 @@
-function annotatePathway!(graph::AbstractMetaGraph,dbParams::Dict)
+function annotatePathway!(graph::AbstractGraph,dbParams::Dict;verbose=false)
 
 	df = DataFrame()
 	verts = []
@@ -8,7 +8,7 @@ function annotatePathway!(graph::AbstractMetaGraph,dbParams::Dict)
 	dbParams[:entpfxs]="uniprot:"
 	un_verts = filterVertices(graph,:entIdDb,p->occursin("uniprot",p))
 	un_ids = map(v->props(graph,v)[:entId],un_verts)
-	selectOrthologs!(unique(un_ids),dbParams,df)
+	selectOrthologs!(unique(un_ids),dbParams,df,verbose=verbose)
 
 	ids = vcat(ids,un_ids)
 	verts = vcat(verts,un_verts)
@@ -17,7 +17,7 @@ function annotatePathway!(graph::AbstractMetaGraph,dbParams::Dict)
 	dbParams[:entpfxs]="ensembl:"
 	en_verts = filterVertices(graph,:entIdDb,p->occursin("ensembl",p))
 	en_ids = map(v->props(graph,v)[:entId],en_verts)
-	selectOrthologs!(unique(en_ids),dbParams,df)
+	selectOrthologs!(unique(en_ids),dbParams,df,verbose=verbose)
 	ids = vcat(ids,en_ids)
 	verts = vcat(verts,en_verts)
 
