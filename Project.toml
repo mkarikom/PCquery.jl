@@ -2,11 +2,7 @@ name = "PCquery"
 uuid = "235f3f79-a89d-4d04-8acc-8e76a70bca42"
 authors = ["Matt Karikomi <mattkarikomi@gmail.com> and contributors"]
 repo = "https://github.com/mkarikom/PCquery.jl.git"
-<<<<<<< HEAD
-version = "0.3.2"
-=======
 version = "0.3.1"
->>>>>>> 2f0ad855149a6edda3c497a3f10f5c65cc8aa50c
 
 [deps]
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
