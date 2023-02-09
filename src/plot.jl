@@ -101,7 +101,6 @@ function plotDag(g::AbstractGraph,gParams::Dict;verbose=false)
                     edge_styles=edgestyles,
                     edge_labels=edgelabels,
                     options=gParams[:opt])
-
     if split(gParams[:fname],".")[end] == "tex"
         TikzPictures.save(TEX(gParams[:fname]), gp)
     elseif split(gParams[:fname],".")[end] == "svg"
