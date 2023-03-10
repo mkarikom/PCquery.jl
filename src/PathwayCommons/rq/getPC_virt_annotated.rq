@@ -38,8 +38,8 @@ WHERE {
 										   bp:TransportWithBiochemicalReaction}
 	?pw a bp:Pathway ;
 					bp:pathwayComponent* ?interaction .
-	?partPred rdfs:subPropertyOf* bp:participant .
-	?intType rdfs:subClassOf+ bp:Interaction .
+	?partPred rdfs:subPropertyOf bp:participant .
+	# ?intType rdfs:subClassOf+ bp:Interaction .
 	FILTER NOT EXISTS { ?intType rdfs:subClassOf+ bp:Control }
 	?interaction ?partPred ?participant ;
 							 a ?intType .
