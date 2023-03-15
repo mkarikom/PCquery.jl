@@ -3,7 +3,6 @@ module PCquery
 import HTTP.IOExtras
 using HTTP,URIs
 using Mustache
-using TikzGraphs,TikzPictures,LaTeXStrings,ColorSchemes
 using JLD2
 using LightXML,DataFrames,Query,JSON
 using Graphs, MetaGraphs
@@ -34,11 +33,7 @@ export requestTTL, topPathsGet, getHttp, searchPathsGet
 # LRpairs_module
 export getCxLR
 
-# plotting
-export plotDagLRT, plotDag, plotDagExp
-
 include("util.jl") # saving and loading data
-include("plot.jl") # plotting
 include("http.jl") # override delimiters
 include("query.jl") # sparql tools for various endpoints
 include("graph.jl") # find paths
