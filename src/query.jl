@@ -213,9 +213,10 @@ function searchPathsGet(params::Dict)
 	resp = HTTP.request("GET",uri)
 	parsed = JSON.parse(String(resp.body))
 	hits = parsed["searchHit"]
-	df = DataFrame(
-			typeof.(values(hits[1])),
-			Symbol.(names(hits[1])),0)
+
+	colnames = Symbol.(keys(hits[1]))
+	coltypes = typeof.(values(hits[1]))
+	df = DataFrame(colnames .=> [type[] for type in coltypes])
 	if !isnothing(namefilter)
 		for i in 1:length(hits)
 			for j in 1:length(namefilter)
@@ -229,5 +230,6 @@ function searchPathsGet(params::Dict)
 			push!(df,hits[i])
 		end
 	end
+	rename!(df,:uri => :pw) # make this compatible with getPathways()
 	unique(df)
 end
